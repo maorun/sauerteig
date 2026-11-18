@@ -2,6 +2,7 @@ import './style.css';
 import {
   buildSchedule,
   calcAmounts,
+  calcTargetOptions,
   calcTiming,
   getPhase,
   MAX_TEMP_C,
@@ -9,6 +10,7 @@ import {
   parseRatio,
   splitHours,
   type PhaseName,
+  type TargetOption,
 } from './calc';
 
 const STORE_KEY = 'sauerteig:start';
@@ -172,6 +174,104 @@ $('btn-reset').addEventListener('click', () => {
   startEl.value = toLocalInput(new Date());
   render();
 });
+
+// --- Target time calculator ---
+const tTargetEl = $<HTMLInputElement>('t-target');
+const tStartEl = $<HTMLInputElement>('t-start');
+const tTotalEl = $<HTMLInputElement>('t-total');
+const tErrorEl = $('t-error');
+const tStatusEl = $('t-status');
+const tWrapEl = $('t-wrap');
+const tBodyEl = $('t-body');
+let tOptions: TargetOption[] = [];
+// Start time of the last calculation, so a selected option keeps the shown peak time.
+let tStartUsed = new Date();
+
+const setTargetStatus = (text: string): void => {
+  if (tStatusEl.textContent !== text) tStatusEl.textContent = text;
+};
+
+const fmtNum = (n: number): string => n.toLocaleString('de-DE', { maximumFractionDigits: 2 });
+
+function showTargetError(msg: string | null): void {
+  tErrorEl.hidden = msg === null;
+  tErrorEl.textContent = msg ?? '';
+}
+
+function renderTarget(): void {
+  tBodyEl.replaceChildren();
+  tOptions = [];
+  tWrapEl.hidden = true;
+  setTargetStatus('');
+  if (tTargetEl.value === '') return showTargetError(null);
+  const target = new Date(tTargetEl.value);
+  const start = tStartEl.value === '' ? new Date() : new Date(tStartEl.value);
+  // The tracker input has minute resolution, so both views use the same whole minute.
+  start.setSeconds(0, 0);
+  const total = Number(tTotalEl.value);
+  if (Number.isNaN(target.getTime()) || Number.isNaN(start.getTime())) return showTargetError('Zielzeit oder Startzeit ungültig.');
+  if (!Number.isFinite(total) || total <= 0 || total > MAX_TOTAL_G) {
+    return showTargetError(`Menge muss zwischen 1 und ${MAX_TOTAL_G} g liegen.`);
+  }
+  if (target.getTime() <= start.getTime()) return showTargetError('Zielzeit muss nach der Startzeit liegen.');
+  showTargetError(null);
+  tStartUsed = start;
+
+  tOptions = calcTargetOptions(target, start, total);
+  if (tOptions.length === 0) {
+    setTargetStatus('Keine Temperatur ergibt ein realistisches Verhältnis. Zielzeit oder Menge ändern.');
+    return;
+  }
+  setTargetStatus(`${tOptions.length} Option${tOptions.length === 1 ? '' : 'en'} für ${fmtDuration(tOptions[0].durationHours)} bis zum Peak (Start ${fmtTime.format(start)}).`);
+  tOptions.forEach((o, i) => {
+    const tr = document.createElement('tr');
+    const cells = [
+      `${fmtNum(o.tempC)} °C`,
+      `1 : 1 : ${fmtNum(o.starterShare)}`,
+      `${o.amounts.flour} g`,
+      `${o.amounts.water} g`,
+      `${o.amounts.starter} g`,
+      fmtDuration(o.durationHours),
+    ];
+    for (const text of cells) {
+      const td = document.createElement('td');
+      td.textContent = text;
+      tr.append(td);
+    }
+    const td = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Wählen';
+    btn.setAttribute('aria-label', `Option ${fmtNum(o.tempC)} °C übernehmen`);
+    btn.dataset.index = String(i);
+    td.append(btn);
+    tr.append(td);
+    tBodyEl.append(tr);
+  });
+  tWrapEl.hidden = false;
+}
+
+tBodyEl.addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest('button');
+  const o = btn ? tOptions[Number(btn.dataset.index)] : undefined;
+  if (!btn || !o) return;
+  ratioEl.value = `1:1:${Number(o.starterShare.toPrecision(6))}`;
+  tempEl.value = String(o.tempC);
+  totalEl.value = tTotalEl.value;
+  // The tracker starts at the chosen start time, so its peak matches the target time.
+  startEl.value = toLocalInput(tStartUsed);
+  store.set(tStartUsed.toISOString());
+  render();
+  setTargetStatus(`Option ${fmtNum(o.tempC)} °C übernommen.`);
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const heading = $('h-amounts');
+  heading.tabIndex = -1;
+  heading.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+  heading.focus({ preventScroll: true });
+});
+const tFormEl = $('target-form');
+tFormEl.addEventListener('input', renderTarget);
+tFormEl.addEventListener('submit', (e) => e.preventDefault());
 
 render();
 

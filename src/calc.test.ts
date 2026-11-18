@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildSchedule,
+  calcTargetOptions,
+  MIN_STARTER_SHARE,
+  MAX_STARTER_SHARE,
+  starterShareForPeak,
+  TARGET_TEMPS_C,
   calcAmounts,
   calcTiming,
   doublingTimeHours,
@@ -183,5 +188,72 @@ describe('splitHours', () => {
     expect(splitHours(5.5)).toEqual({ hours: 5, minutes: 30 });
     expect(splitHours(1.999)).toEqual({ hours: 2, minutes: 0 });
     expect(splitHours(0)).toEqual({ hours: 0, minutes: 0 });
+  });
+});
+
+describe('calcTargetOptions', () => {
+  const start = new Date('2026-01-01T08:00:00Z');
+  const at = (h: number) => new Date(start.getTime() + h * 3_600_000);
+
+  it('throws for a target that is not after the start', () => {
+    expect(() => calcTargetOptions(start, start, 150)).toThrow(RangeError);
+    expect(() => calcTargetOptions(at(-1), start, 150)).toThrow(RangeError);
+  });
+
+  it.each([4, 8, 12, 24])('round-trips %i h through calcTiming (regression)', (h) => {
+    const options = calcTargetOptions(at(h), start, 200);
+    expect(options.length).toBeGreaterThan(0);
+    for (const o of options) {
+      expect(calcTiming(o.ratio, o.tempC).peakHours).toBeCloseTo(h, 6);
+      expect(o.starterShare).toBeGreaterThanOrEqual(MIN_STARTER_SHARE);
+      expect(o.starterShare).toBeLessThanOrEqual(MAX_STARTER_SHARE);
+      expect(o.amounts.flour + o.amounts.water + o.amounts.starter).toBe(200);
+    }
+  });
+
+  it('needs less starter at warmer temperatures', () => {
+    const options = calcTargetOptions(at(12), start, 300);
+    for (let i = 1; i < options.length; i++) {
+      expect(options[i].starterShare).toBeLessThan(options[i - 1].starterShare);
+    }
+  });
+
+  it('filters extreme ratios', () => {
+    // 4 h at 18 °C needs more starter than the upper bound allows.
+    const temps = calcTargetOptions(at(4), start, 200).map((o) => o.tempC);
+    expect(temps).not.toContain(18);
+    // 24 h at 28 °C needs less starter than the lower bound allows.
+    expect(calcTargetOptions(at(24), start, 200).map((o) => o.tempC)).not.toContain(28);
+    // Very short target: no option at all.
+    expect(calcTargetOptions(at(0.5), start, 200)).toEqual([]);
+  });
+
+  it.each([
+    ['upper', 3, 3 - 1e-6, 3 + 1e-6],
+    ['lower', 0.05, 0.05 + 1e-6, 0.05 - 1e-6],
+  ])('applies the %s starter share bound', (_name, _bound, inside, outside) => {
+    const hours = (s: number) => calcTiming({ flour: 1, water: 1, starter: s }, 24).peakHours;
+    expect(calcTargetOptions(at(hours(inside)), start, 1000, [24])).toHaveLength(1);
+    expect(calcTargetOptions(at(hours(outside)), start, 1000, [24])).toHaveLength(0);
+  });
+
+  it('skips options whose amounts round to zero grams', () => {
+    // 2 g split as 1 g flour, 1 g water and 0 g starter: every option is dropped.
+    expect(calcTargetOptions(at(8), start, 2)).toEqual([]);
+    expect(calcTargetOptions(at(8), start, 200).length).toBeGreaterThan(0);
+  });
+
+  it.each([0.1, 0.5, 1, 2.5])('inverts the formula at every temperature for s = %f', (s) => {
+    for (const t of TARGET_TEMPS_C) {
+      const peak = calcTiming({ flour: 1, water: 1, starter: s }, t).peakHours;
+      expect(starterShareForPeak(peak, t)).toBeCloseTo(s, 9);
+    }
+  });
+
+  it('returns null for impossible durations', () => {
+    expect(starterShareForPeak(0, 22)).toBeNull();
+    expect(starterShareForPeak(Number.NaN, 22)).toBeNull();
+    // Shorter than a pure-starter refill can take: share would be infinite.
+    expect(starterShareForPeak(0.1, 22)).toBeNull();
   });
 });
