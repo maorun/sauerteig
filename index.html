@@ -30,6 +30,40 @@
         <p id="error" role="alert" class="error" hidden></p>
       </form>
 
+      <section class="card" aria-labelledby="h-target">
+        <h2 id="h-target">Zielzeit-Rechner</h2>
+        <form id="target-form" class="target-form" novalidate>
+          <label>Zielzeit (Peak)
+            <input id="t-target" type="datetime-local" />
+          </label>
+          <label>Startzeit (leer = jetzt)
+            <input id="t-start" type="datetime-local" />
+          </label>
+          <label>Gewünschte Menge (g)
+            <input id="t-total" type="number" inputmode="decimal" value="150" min="1" max="1000000" step="1" />
+          </label>
+          <p id="t-error" role="alert" class="error" hidden></p>
+        </form>
+        <p id="t-status" class="muted" aria-live="polite"></p>
+        <div class="table-wrap" id="t-wrap" role="region" aria-label="Optionen für die Zielzeit" tabindex="0" hidden>
+          <table id="t-table">
+            <caption class="sr-only">Mögliche Temperaturen für die Zielzeit</caption>
+            <thead>
+              <tr>
+                <th scope="col">Temp.</th>
+                <th scope="col">Verhältnis</th>
+                <th scope="col">Mehl</th>
+                <th scope="col">Wasser</th>
+                <th scope="col">ASG</th>
+                <th scope="col">Dauer</th>
+                <th scope="col"><span class="sr-only">Aktion</span></th>
+              </tr>
+            </thead>
+            <tbody id="t-body"></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="card" aria-labelledby="h-amounts">
         <h2 id="h-amounts">Zutaten</h2>
         <dl class="grid">

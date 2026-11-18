@@ -58,4 +58,12 @@ button {
   border: 2px solid var(--accent); background: var(--accent); color: var(--accent-text); cursor: pointer; flex: 1;
 }
 button.secondary { background: transparent; color: var(--text); }
+.target-form { display: grid; gap: 0.75rem; }
+.muted { color: var(--muted); margin: 0.5rem 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { color: var(--muted); font-size: 0.85rem; }
+td button { flex: none; min-width: 2.75rem; padding: 0.4rem 0.75rem; }
 @media (prefers-reduced-motion: reduce) { .bar-fill { transition: none; } }

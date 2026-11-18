@@ -125,3 +125,55 @@ export function splitHours(hours: number): { hours: number; minutes: number } {
   const total = Math.round(Math.max(0, hours) * 60);
   return { hours: Math.floor(total / 60), minutes: total % 60 };
 }
+
+export interface TargetOption {
+  tempC: number;
+  /** Starter share relative to 1 part flour and 1 part water (1:1:s). */
+  starterShare: number;
+  ratio: Ratio;
+  /** Hours from start to peak. */
+  durationHours: number;
+  /** Rounded to whole grams, so small totals deviate slightly from the exact ratio. */
+  amounts: Amounts;
+}
+
+export const TARGET_TEMPS_C: readonly number[] = [18, 20, 22, 24, 26, 28];
+/** Realistic bounds for s in 1:1:s (1:1:0.05 = 1:20:20 down to 1:1:3). */
+export const MIN_STARTER_SHARE = 0.05;
+export const MAX_STARTER_SHARE = 3;
+
+/**
+ * Inverts the peakHours formula of calcTiming for a 100 % hydration ratio 1:1:s.
+ * Returns null if no starter share exists for this duration and temperature.
+ */
+export function starterShareForPeak(peakHours: number, tempC: number): number | null {
+  if (!Number.isFinite(peakHours) || peakHours <= 0) return null;
+  const refDilution = Math.log2(3);
+  const base = doublingTimeHours(tempC);
+  // peakHours = base * PEAK_DOUBLINGS * (dilution + 1) / (refDilution + 1), with dilution = log2(1 / f).
+  const dilution = (peakHours * (refDilution + 1)) / (base * PEAK_DOUBLINGS) - 1;
+  if (dilution <= 0) return null; // f >= 1: cannot be reached, even pure starter is too slow
+  const fraction = Math.pow(2, -dilution);
+  return (2 * fraction) / (1 - fraction);
+}
+
+export function calcTargetOptions(
+  target: Date,
+  start: Date,
+  total: number,
+  temps: readonly number[] = TARGET_TEMPS_C,
+): TargetOption[] {
+  assertPositive(total, 'total');
+  const durationHours = (target.getTime() - start.getTime()) / 3_600_000;
+  assertPositive(durationHours, 'duration');
+  const options: TargetOption[] = [];
+  for (const tempC of temps) {
+    const s = starterShareForPeak(durationHours, tempC);
+    if (s === null || s < MIN_STARTER_SHARE || s > MAX_STARTER_SHARE) continue;
+    const ratio: Ratio = { flour: 1, water: 1, starter: s };
+    const amounts = calcAmounts(ratio, total);
+    if (amounts.flour < 1 || amounts.water < 1 || amounts.starter < 1) continue;
+    options.push({ tempC, starterShare: s, ratio, durationHours, amounts });
+  }
+  return options;
+}
