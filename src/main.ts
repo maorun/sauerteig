@@ -276,7 +276,23 @@ tFormEl.addEventListener('submit', (e) => e.preventDefault());
 render();
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  // Reload when a new worker takes over, so the page runs the new release.
+  // The first claim of an uncontrolled page needs no reload. Later takeovers do.
+  let hasController = navigator.serviceWorker.controller !== null;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hasController) {
+      hasController = true;
+      return;
+    }
+    if (reloading) return;
+    reloading = true;
+    window.location.reload();
+  });
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => undefined);
+    navigator.serviceWorker
+      .register(`${import.meta.env.BASE_URL}sw.js`)
+      .then((reg) => reg.update())
+      .catch(() => undefined);
   });
 }
