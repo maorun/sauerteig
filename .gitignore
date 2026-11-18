@@ -1,0 +1,4 @@
+node_modules/
+dist/
+.rovodev/
+.DS_Store
