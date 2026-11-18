@@ -1,0 +1,182 @@
+import './style.css';
+import {
+  buildSchedule,
+  calcAmounts,
+  calcTiming,
+  getPhase,
+  MAX_TEMP_C,
+  MIN_TEMP_C,
+  parseRatio,
+  splitHours,
+  type PhaseName,
+} from './calc';
+
+const STORE_KEY = 'sauerteig:start';
+const MAX_TOTAL_G = 1_000_000;
+
+const $ = <T extends HTMLElement>(id: string): T => {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`#${id} missing`);
+  return el as T;
+};
+
+const PHASE_LABEL: Record<PhaseName, string> = {
+  lag: 'Anlaufphase',
+  growth: 'Wachstum',
+  peak: 'Peak – jetzt verwenden oder füttern',
+  decline: 'Absinkend',
+  over: 'Über dem Peak – bald füttern',
+};
+
+const fmtTime = new Intl.DateTimeFormat('de-DE', {
+  weekday: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+const fmtDuration = (hours: number): string => {
+  const { hours: h, minutes: m } = splitHours(hours);
+  return `${h} h ${String(m).padStart(2, '0')} min`;
+};
+
+const toLocalInput = (d: Date): string => {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
+const ratioEl = $<HTMLInputElement>('ratio');
+const tempEl = $<HTMLInputElement>('temp');
+const totalEl = $<HTMLInputElement>('total');
+const startEl = $<HTMLInputElement>('start');
+const errorEl = $('error');
+
+// Storage can throw in private or blocked modes. The app then runs without persistence.
+const store = {
+  get(): string | null {
+    try {
+      return localStorage.getItem(STORE_KEY);
+    } catch {
+      return null;
+    }
+  },
+  set(value: string): void {
+    try {
+      localStorage.setItem(STORE_KEY, value);
+    } catch {
+      /* no persistence available */
+    }
+  },
+  clear(): void {
+    try {
+      localStorage.removeItem(STORE_KEY);
+    } catch {
+      /* no persistence available */
+    }
+  },
+};
+
+const savedDate = new Date(store.get() ?? NaN);
+startEl.value = toLocalInput(Number.isNaN(savedDate.getTime()) ? new Date() : savedDate);
+
+let tick: number | undefined;
+
+const OUTPUT_IDS = ['o-flour', 'o-water', 'o-starter', 'o-doubling', 'o-peak', 's-start', 's-peak', 's-end'];
+
+function showError(msg: string | null): void {
+  errorEl.hidden = msg === null;
+  errorEl.textContent = msg ?? '';
+  if (msg === null) return;
+  // Clear stale results so the page never shows values for invalid input.
+  for (const id of OUTPUT_IDS) $(id).textContent = '–';
+  $('phase-name').textContent = '–';
+  delete $('phase-name').dataset.phase;
+  $('bar').setAttribute('aria-valuenow', '0');
+  $('bar-fill').style.width = '0%';
+  $('countdown').textContent = '–';
+}
+
+function render(): void {
+  window.clearInterval(tick);
+  const ratio = parseRatio(ratioEl.value);
+  const temp = Number(tempEl.value);
+  const total = Number(totalEl.value);
+  const start = new Date(startEl.value);
+
+  if (!ratio) return showError('Verhältnis im Format 1:1:1 eingeben (nur positive Zahlen).');
+  if (!Number.isFinite(temp) || tempEl.value === '' || temp < MIN_TEMP_C || temp > MAX_TEMP_C) {
+    return showError(`Temperatur muss zwischen ${MIN_TEMP_C} und ${MAX_TEMP_C} °C liegen.`);
+  }
+  if (!Number.isFinite(total) || total <= 0 || total > MAX_TOTAL_G) {
+    return showError(`Menge muss zwischen 1 und ${MAX_TOTAL_G} g liegen.`);
+  }
+  if (Number.isNaN(start.getTime())) return showError('Startzeit ungültig.');
+  showError(null);
+
+  const amounts = calcAmounts(ratio, total);
+  if (amounts.flour < 1 || amounts.water < 1 || amounts.starter < 1) {
+    return showError('Menge zu klein für dieses Verhältnis. Menge erhöhen.');
+  }
+  const timing = calcTiming(ratio, temp);
+  const schedule = buildSchedule(start, timing);
+
+  $('o-flour').textContent = `${amounts.flour} g`;
+  $('o-water').textContent = `${amounts.water} g`;
+  $('o-starter').textContent = `${amounts.starter} g`;
+  $('o-doubling').textContent = fmtDuration(timing.doublingHours);
+  $('o-peak').textContent = fmtDuration(timing.peakHours);
+  $('s-start').textContent = fmtTime.format(schedule.start);
+  $('s-peak').textContent = fmtTime.format(schedule.peak);
+  $('s-end').textContent = fmtTime.format(schedule.windowEnd);
+
+  const update = (): void => {
+    const elapsed = (Date.now() - start.getTime()) / 3_600_000;
+    const phase = getPhase(elapsed, timing);
+    // Write only on change, so the live region does not announce the same phase each second.
+    if ($('phase-name').dataset.phase !== phase.name) {
+      $('phase-name').textContent = PHASE_LABEL[phase.name];
+      $('phase-name').dataset.phase = phase.name;
+    }
+    const pct = Math.round(phase.progress * 100);
+    $('bar').setAttribute('aria-valuenow', String(pct));
+    $('bar-fill').style.width = `${pct}%`;
+    const toPeak = timing.peakHours - elapsed;
+    $('countdown').textContent =
+      elapsed < 0
+        ? `Start in ${fmtDuration(-elapsed)}`
+        : toPeak > 0
+          ? `Noch ${fmtDuration(toPeak)} bis Peak`
+          : `Peak vor ${fmtDuration(-toPeak)} erreicht`;
+  };
+  update();
+  tick = window.setInterval(update, 1000);
+}
+
+// The start field renders on "change" only, so a half-typed date causes no error flash.
+document.getElementById('form')?.addEventListener('input', (e) => {
+  if (e.target !== startEl) render();
+});
+startEl.addEventListener('change', () => {
+  const d = new Date(startEl.value);
+  if (Number.isNaN(d.getTime())) store.clear();
+  else store.set(d.toISOString());
+  render();
+});
+$('btn-start').addEventListener('click', () => {
+  const now = new Date();
+  startEl.value = toLocalInput(now);
+  store.set(now.toISOString());
+  render();
+});
+$('btn-reset').addEventListener('click', () => {
+  store.clear();
+  startEl.value = toLocalInput(new Date());
+  render();
+});
+
+render();
+
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => undefined);
+  });
+}

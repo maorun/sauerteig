@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#7a4a1e" />
+    <meta name="description" content="Rechner für Anstellgut-Zyklen" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon-192.png" />
+    <title>Sauerteig Anstellgut</title>
+  </head>
+  <body>
+    <main id="app">
+      <h1>Sauerteig Anstellgut</h1>
+
+      <form id="form" class="card" novalidate>
+        <label>Verhältnis Mehl : Wasser : ASG
+          <input id="ratio" inputmode="text" value="1:1:1" autocomplete="off" />
+        </label>
+        <label>Temperatur (°C)
+          <input id="temp" type="number" inputmode="decimal" value="24" min="4" max="38" step="0.5" />
+        </label>
+        <label>Gewünschte Menge (g)
+          <input id="total" type="number" inputmode="decimal" value="150" min="1" max="1000000" step="1" />
+        </label>
+        <label>Startzeit
+          <input id="start" type="datetime-local" />
+        </label>
+        <p id="error" role="alert" class="error" hidden></p>
+      </form>
+
+      <section class="card" aria-labelledby="h-amounts">
+        <h2 id="h-amounts">Zutaten</h2>
+        <dl class="grid">
+          <div><dt>Mehl</dt><dd id="o-flour">–</dd></div>
+          <div><dt>Wasser</dt><dd id="o-water">–</dd></div>
+          <div><dt>ASG</dt><dd id="o-starter">–</dd></div>
+        </dl>
+      </section>
+
+      <section class="card" aria-labelledby="h-time">
+        <h2 id="h-time">Zeit bis Peak</h2>
+        <dl class="grid">
+          <div><dt>Verdopplung</dt><dd id="o-doubling">–</dd></div>
+          <div><dt>Maximale Aktivität</dt><dd id="o-peak">–</dd></div>
+        </dl>
+      </section>
+
+      <section class="card" aria-labelledby="h-sched">
+        <h2 id="h-sched">Zeitplan</h2>
+        <ul class="schedule">
+          <li><span>Start</span><time id="s-start"></time></li>
+          <li><span>Peak</span><time id="s-peak"></time></li>
+          <li><span>Lagerfenster bis</span><time id="s-end"></time></li>
+        </ul>
+      </section>
+
+      <section class="card" aria-labelledby="h-phase">
+        <h2 id="h-phase">Wachstumsphase</h2>
+        <p id="phase-name" class="phase" aria-live="polite">–</p>
+        <div id="bar" class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="h-phase">
+          <div id="bar-fill" class="bar-fill"></div>
+        </div>
+        <p id="countdown" class="countdown" aria-live="off">–</p>
+        <div class="row">
+          <button id="btn-start" type="button">Jetzt füttern</button>
+          <button id="btn-reset" type="button" class="secondary">Zurücksetzen</button>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
