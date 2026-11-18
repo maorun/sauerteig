@@ -4,16 +4,21 @@ import {
   calcAmounts,
   calcTargetOptions,
   calcTiming,
+  DEFAULT_FLOUR,
+  FLOUR_LABELS,
+  isFlourType,
   getPhase,
   MAX_TEMP_C,
   MIN_TEMP_C,
   parseRatio,
   splitHours,
+  type FlourType,
   type PhaseName,
   type TargetOption,
 } from './calc';
 
 const STORE_KEY = 'sauerteig:start';
+const FLOUR_KEY = 'sauerteig:flour';
 const MAX_TOTAL_G = 1_000_000;
 
 const $ = <T extends HTMLElement>(id: string): T => {
@@ -46,6 +51,9 @@ const toLocalInput = (d: Date): string => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
+const flourEl = $<HTMLSelectElement>('flour');
+// Select values come from the DOM, so a tampered option falls back to the default.
+const getFlour = (el: HTMLSelectElement): FlourType => (isFlourType(el.value) ? el.value : DEFAULT_FLOUR);
 const ratioEl = $<HTMLInputElement>('ratio');
 const tempEl = $<HTMLInputElement>('temp');
 const totalEl = $<HTMLInputElement>('total');
@@ -54,16 +62,16 @@ const errorEl = $('error');
 
 // Storage can throw in private or blocked modes. The app then runs without persistence.
 const store = {
-  get(): string | null {
+  get(key = STORE_KEY): string | null {
     try {
-      return localStorage.getItem(STORE_KEY);
+      return localStorage.getItem(key);
     } catch {
       return null;
     }
   },
-  set(value: string): void {
+  set(value: string, key = STORE_KEY): void {
     try {
-      localStorage.setItem(STORE_KEY, value);
+      localStorage.setItem(key, value);
     } catch {
       /* no persistence available */
     }
@@ -79,6 +87,10 @@ const store = {
 
 const savedDate = new Date(store.get() ?? NaN);
 startEl.value = toLocalInput(Number.isNaN(savedDate.getTime()) ? new Date() : savedDate);
+
+const savedFlour = store.get(FLOUR_KEY);
+const initialFlour: FlourType = isFlourType(savedFlour) ? savedFlour : DEFAULT_FLOUR;
+flourEl.value = initialFlour;
 
 let tick: number | undefined;
 
@@ -118,7 +130,7 @@ function render(): void {
   if (amounts.flour < 1 || amounts.water < 1 || amounts.starter < 1) {
     return showError('Menge zu klein für dieses Verhältnis. Menge erhöhen.');
   }
-  const timing = calcTiming(ratio, temp);
+  const timing = calcTiming(ratio, temp, getFlour(flourEl));
   const schedule = buildSchedule(start, timing);
 
   $('o-flour').textContent = `${amounts.flour} g`;
@@ -153,9 +165,20 @@ function render(): void {
   tick = window.setInterval(update, 1000);
 }
 
+// Both flour selects stay in sync, and each change updates both calculators.
+function setFlour(flour: FlourType, rerender = true): void {
+  flourEl.value = flour;
+  tFlourEl.value = flour;
+  store.set(flour, FLOUR_KEY);
+  if (!rerender) return;
+  render();
+  renderTarget();
+}
+
 // The start field renders on "change" only, so a half-typed date causes no error flash.
 document.getElementById('form')?.addEventListener('input', (e) => {
-  if (e.target !== startEl) render();
+  if (e.target === flourEl) setFlour(getFlour(flourEl));
+  else if (e.target !== startEl) render();
 });
 startEl.addEventListener('change', () => {
   const d = new Date(startEl.value);
@@ -176,6 +199,8 @@ $('btn-reset').addEventListener('click', () => {
 });
 
 // --- Target time calculator ---
+const tFlourEl = $<HTMLSelectElement>('t-flour');
+tFlourEl.value = flourEl.value;
 const tTargetEl = $<HTMLInputElement>('t-target');
 const tStartEl = $<HTMLInputElement>('t-start');
 const tTotalEl = $<HTMLInputElement>('t-total');
@@ -217,12 +242,12 @@ function renderTarget(): void {
   showTargetError(null);
   tStartUsed = start;
 
-  tOptions = calcTargetOptions(target, start, total);
+  tOptions = calcTargetOptions(target, start, total, undefined, getFlour(tFlourEl));
   if (tOptions.length === 0) {
     setTargetStatus('Keine Temperatur ergibt ein realistisches Verhältnis. Zielzeit oder Menge ändern.');
     return;
   }
-  setTargetStatus(`${tOptions.length} Option${tOptions.length === 1 ? '' : 'en'} für ${fmtDuration(tOptions[0].durationHours)} bis zum Peak (Start ${fmtTime.format(start)}).`);
+  setTargetStatus(`${tOptions.length} Option${tOptions.length === 1 ? '' : 'en'} mit ${FLOUR_LABELS[getFlour(tFlourEl)]} für ${fmtDuration(tOptions[0].durationHours)} bis zum Peak (Start ${fmtTime.format(start)}).`);
   tOptions.forEach((o, i) => {
     const tr = document.createElement('tr');
     const cells = [
@@ -255,6 +280,7 @@ tBodyEl.addEventListener('click', (e) => {
   const btn = (e.target as HTMLElement).closest('button');
   const o = btn ? tOptions[Number(btn.dataset.index)] : undefined;
   if (!btn || !o) return;
+  setFlour(o.flour, false);
   ratioEl.value = `1:1:${Number(o.starterShare.toPrecision(6))}`;
   tempEl.value = String(o.tempC);
   totalEl.value = tTotalEl.value;
@@ -270,7 +296,10 @@ tBodyEl.addEventListener('click', (e) => {
   heading.focus({ preventScroll: true });
 });
 const tFormEl = $('target-form');
-tFormEl.addEventListener('input', renderTarget);
+tFormEl.addEventListener('input', (e) => {
+  if (e.target === tFlourEl) setFlour(getFlour(tFlourEl));
+  else renderTarget();
+});
 tFormEl.addEventListener('submit', (e) => e.preventDefault());
 
 render();

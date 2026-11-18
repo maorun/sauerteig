@@ -7,6 +7,13 @@ import {
   starterShareForPeak,
   TARGET_TEMPS_C,
   calcAmounts,
+  DEFAULT_FLOUR,
+  FLOUR_LABELS,
+  FLOUR_SPEED,
+  FLOUR_TYPES,
+  flourSpeedFactor,
+  isFlourType,
+  type FlourType,
   calcTiming,
   doublingTimeHours,
   getPhase,
@@ -255,5 +262,88 @@ describe('calcTargetOptions', () => {
     expect(starterShareForPeak(Number.NaN, 22)).toBeNull();
     // Shorter than a pure-starter refill can take: share would be infinite.
     expect(starterShareForPeak(0.1, 22)).toBeNull();
+  });
+});
+
+describe('flour types', () => {
+  const ratio = { flour: 1, water: 1, starter: 1 };
+
+  it('defines the speed factor of each flour type', () => {
+    expect(FLOUR_SPEED).toEqual({
+      'rye-whole': 0.75,
+      rye: 0.82,
+      'wheat-whole': 0.85,
+      spelt: 0.9,
+      'wheat-white': 1,
+    });
+    for (const f of FLOUR_TYPES) {
+      expect(flourSpeedFactor(f)).toBe(FLOUR_SPEED[f]);
+      expect(FLOUR_LABELS[f]).not.toBe('');
+    }
+  });
+
+  it('uses wheat 550 as baseline and default', () => {
+    expect(DEFAULT_FLOUR).toBe('wheat-white');
+    expect(flourSpeedFactor()).toBe(1);
+    expect(calcTiming(ratio, 24, 'wheat-white')).toEqual(calcTiming(ratio, 24));
+  });
+
+  it('validates flour types', () => {
+    expect(isFlourType('rye-whole')).toBe(true);
+    expect(isFlourType('toString')).toBe(false);
+    expect(isFlourType(undefined)).toBe(false);
+    expect(() => flourSpeedFactor('corn' as FlourType)).toThrow(RangeError);
+  });
+
+  it.each(FLOUR_TYPES)('scales peak and window of %s by its speed factor', (f) => {
+    const base = calcTiming(ratio, 24);
+    const t = calcTiming(ratio, 24, f);
+    expect(t.peakHours).toBeCloseTo(base.peakHours * FLOUR_SPEED[f], 9);
+    expect(t.doublingHours).toBeCloseTo(base.doublingHours * FLOUR_SPEED[f], 9);
+    expect(t.windowEndHours).toBeCloseTo(base.windowEndHours * FLOUR_SPEED[f], 9);
+  });
+
+  it('orders the flours from fastest to slowest', () => {
+    const peaks = FLOUR_TYPES.map((f) => calcTiming(ratio, 24, f).peakHours);
+    for (let i = 1; i < peaks.length; i++) expect(peaks[i]).toBeGreaterThan(peaks[i - 1]);
+  });
+
+  it('lets rye whole grain peak at least 20 % earlier than white wheat', () => {
+    const rye = calcTiming(ratio, 24, 'rye-whole').peakHours;
+    const wheat = calcTiming(ratio, 24, 'wheat-white').peakHours;
+    expect(rye).toBeLessThan(wheat * 0.8);
+  });
+
+  describe('target time round trip', () => {
+    const start = new Date('2026-03-01T08:00:00Z');
+    const at = (h: number) => new Date(start.getTime() + h * 3_600_000);
+
+    it.each(FLOUR_TYPES)('reproduces the target duration with %s', (f) => {
+      const options = calcTargetOptions(at(10), start, 1000, [20, 24], f);
+      expect(options.length).toBeGreaterThan(0);
+      for (const o of options) {
+        expect(o.flour).toBe(f);
+        expect(calcTiming(o.ratio, o.tempC, f).peakHours).toBeCloseTo(10, 6);
+      }
+    });
+
+    it('needs more starter with slower flour for the same target', () => {
+      const share = (f: FlourType) => calcTargetOptions(at(10), start, 1000, [24], f)[0].starterShare;
+      expect(share('rye-whole')).toBeLessThan(share('wheat-white'));
+    });
+
+    it('inverts starterShareForPeak per flour', () => {
+      for (const f of FLOUR_TYPES) {
+        const s = starterShareForPeak(8, 22, f);
+        expect(s).not.toBeNull();
+        expect(calcTiming({ flour: 1, water: 1, starter: s as number }, 22, f).peakHours).toBeCloseTo(8, 9);
+      }
+    });
+
+    it('defaults to wheat 550 like before', () => {
+      expect(calcTargetOptions(at(10), start, 1000)).toEqual(
+        calcTargetOptions(at(10), start, 1000, TARGET_TEMPS_C, 'wheat-white'),
+      );
+    });
   });
 });
