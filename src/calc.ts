@@ -26,6 +26,9 @@ export interface Schedule {
   windowEnd: Date;
 }
 
+/** Flour types, from fastest to slowest fermentation. */
+export type FlourType = 'rye-whole' | 'rye' | 'wheat-whole' | 'spelt' | 'wheat-white';
+
 export type PhaseName = 'lag' | 'growth' | 'peak' | 'decline' | 'over';
 
 export interface Phase {
@@ -44,6 +47,38 @@ export const MAX_TEMP_C = 38;
 /** Peak lies at the point where the volume has tripled (log2(3) doublings). */
 const PEAK_DOUBLINGS = Math.log2(3);
 const WINDOW_FACTOR = 1.5;
+
+/**
+ * Time factor per flour type relative to wheat flour type 550 (1.0).
+ * Below 1 = faster: more ash and enzymes feed the culture.
+ */
+export const FLOUR_SPEED: Readonly<Record<FlourType, number>> = {
+  'rye-whole': 0.75,
+  rye: 0.82,
+  'wheat-whole': 0.85,
+  spelt: 0.9,
+  'wheat-white': 1,
+};
+
+export const FLOUR_LABELS: Readonly<Record<FlourType, string>> = {
+  'rye-whole': 'Roggenvollkornmehl',
+  rye: 'Roggenmehl (Type 997/1150)',
+  'wheat-whole': 'Weizenvollkornmehl',
+  spelt: 'Dinkelmehl',
+  'wheat-white': 'Weizenmehl (Type 550)',
+};
+
+export const FLOUR_TYPES: readonly FlourType[] = Object.keys(FLOUR_SPEED) as FlourType[];
+export const DEFAULT_FLOUR: FlourType = 'wheat-white';
+
+export function isFlourType(value: unknown): value is FlourType {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(FLOUR_SPEED, value);
+}
+
+export function flourSpeedFactor(flour: FlourType = DEFAULT_FLOUR): number {
+  if (!isFlourType(flour)) throw new RangeError(`unknown flour type: ${String(flour)}`);
+  return FLOUR_SPEED[flour];
+}
 
 function assertPositive(value: number, name: string): void {
   if (!Number.isFinite(value) || value <= 0) {
@@ -77,7 +112,7 @@ export function doublingTimeHours(tempC: number): number {
   return REF_DOUBLING_H * Math.pow(2, (REF_TEMP_C - t) / TEMP_STEP_C);
 }
 
-export function calcTiming(ratio: Ratio, tempC: number): Timing {
+export function calcTiming(ratio: Ratio, tempC: number, flour: FlourType = DEFAULT_FLOUR): Timing {
   assertPositive(ratio.flour, 'flour');
   assertPositive(ratio.water, 'water');
   assertPositive(ratio.starter, 'starter');
@@ -92,7 +127,7 @@ export function calcTiming(ratio: Ratio, tempC: number): Timing {
   // Hydration (water / flour): wetter dough ferments a little faster.
   const hydration = ratio.water / ratio.flour;
   const hydrationFactor = Math.min(1.25, Math.max(0.8, 1 - 0.15 * Math.log2(hydration)));
-  const peakHours = base * PEAK_DOUBLINGS * starterFactor * hydrationFactor;
+  const peakHours = base * PEAK_DOUBLINGS * starterFactor * hydrationFactor * flourSpeedFactor(flour);
   return {
     doublingHours: peakHours / PEAK_DOUBLINGS,
     peakHours,
@@ -133,6 +168,7 @@ export interface TargetOption {
   ratio: Ratio;
   /** Hours from start to peak. */
   durationHours: number;
+  flour: FlourType;
   /** Rounded to whole grams, so small totals deviate slightly from the exact ratio. */
   amounts: Amounts;
 }
@@ -146,10 +182,14 @@ export const MAX_STARTER_SHARE = 3;
  * Inverts the peakHours formula of calcTiming for a 100 % hydration ratio 1:1:s.
  * Returns null if no starter share exists for this duration and temperature.
  */
-export function starterShareForPeak(peakHours: number, tempC: number): number | null {
+export function starterShareForPeak(
+  peakHours: number,
+  tempC: number,
+  flour: FlourType = DEFAULT_FLOUR,
+): number | null {
   if (!Number.isFinite(peakHours) || peakHours <= 0) return null;
   const refDilution = Math.log2(3);
-  const base = doublingTimeHours(tempC);
+  const base = doublingTimeHours(tempC) * flourSpeedFactor(flour);
   // peakHours = base * PEAK_DOUBLINGS * (dilution + 1) / (refDilution + 1), with dilution = log2(1 / f).
   const dilution = (peakHours * (refDilution + 1)) / (base * PEAK_DOUBLINGS) - 1;
   if (dilution <= 0) return null; // f >= 1: cannot be reached, even pure starter is too slow
@@ -162,18 +202,19 @@ export function calcTargetOptions(
   start: Date,
   total: number,
   temps: readonly number[] = TARGET_TEMPS_C,
+  flour: FlourType = DEFAULT_FLOUR,
 ): TargetOption[] {
   assertPositive(total, 'total');
   const durationHours = (target.getTime() - start.getTime()) / 3_600_000;
   assertPositive(durationHours, 'duration');
   const options: TargetOption[] = [];
   for (const tempC of temps) {
-    const s = starterShareForPeak(durationHours, tempC);
+    const s = starterShareForPeak(durationHours, tempC, flour);
     if (s === null || s < MIN_STARTER_SHARE || s > MAX_STARTER_SHARE) continue;
     const ratio: Ratio = { flour: 1, water: 1, starter: s };
     const amounts = calcAmounts(ratio, total);
     if (amounts.flour < 1 || amounts.water < 1 || amounts.starter < 1) continue;
-    options.push({ tempC, starterShare: s, ratio, durationHours, amounts });
+    options.push({ tempC, starterShare: s, ratio, durationHours, amounts, flour });
   }
   return options;
 }

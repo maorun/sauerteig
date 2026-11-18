@@ -18,6 +18,16 @@
         <label>Verhältnis Mehl : Wasser : ASG
           <input id="ratio" inputmode="text" value="1:1:1" autocomplete="off" />
         </label>
+        <label>Mehlsorte
+          <select id="flour" aria-describedby="flour-hint">
+            <option value="rye-whole">Roggenvollkornmehl (am schnellsten)</option>
+            <option value="rye">Roggenmehl (Type 997/1150)</option>
+            <option value="wheat-whole">Weizenvollkornmehl</option>
+            <option value="spelt">Dinkelmehl</option>
+            <option value="wheat-white" selected>Weizenmehl (Type 550)</option>
+          </select>
+          <span id="flour-hint" class="hint">Vollkorn- und Roggenmehl gären schneller.</span>
+        </label>
         <label>Temperatur (°C)
           <input id="temp" type="number" inputmode="decimal" value="24" min="4" max="38" step="0.5" />
         </label>
@@ -38,6 +48,16 @@
           </label>
           <label>Startzeit (leer = jetzt)
             <input id="t-start" type="datetime-local" />
+          </label>
+          <label>Mehlsorte
+            <select id="t-flour" aria-describedby="t-flour-hint">
+              <option value="rye-whole">Roggenvollkornmehl (am schnellsten)</option>
+              <option value="rye">Roggenmehl (Type 997/1150)</option>
+              <option value="wheat-whole">Weizenvollkornmehl</option>
+              <option value="spelt">Dinkelmehl</option>
+              <option value="wheat-white" selected>Weizenmehl (Type 550)</option>
+            </select>
+            <span id="t-flour-hint" class="hint">Gleich wie oben; Änderungen gelten für beide Rechner.</span>
           </label>
           <label>Gewünschte Menge (g)
             <input id="t-total" type="number" inputmode="decimal" value="150" min="1" max="1000000" step="1" />
