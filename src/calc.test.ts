@@ -14,6 +14,8 @@ import {
   flourSpeedFactor,
   isFlourType,
   type FlourType,
+  COLD_TEMP_STEP_C,
+  COLD_TEMP_THRESHOLD_C,
   calcTiming,
   doublingTimeHours,
   getPhase,
@@ -81,6 +83,11 @@ describe('doublingTimeHours', () => {
     expect(doublingTimeHours(31)).toBeCloseTo(1.75, 5);
     expect(doublingTimeHours(17)).toBeCloseTo(7, 5);
   });
+  it('slows down much faster below the cold threshold (12 °C)', () => {
+    expect(doublingTimeHours(COLD_TEMP_THRESHOLD_C)).toBeCloseTo(3.5 * Math.pow(2, (24 - COLD_TEMP_THRESHOLD_C) / 7), 5);
+    const atCold = doublingTimeHours(COLD_TEMP_THRESHOLD_C);
+    expect(doublingTimeHours(COLD_TEMP_THRESHOLD_C - COLD_TEMP_STEP_C)).toBeCloseTo(atCold * 2, 5);
+  });
   it('is slow at low temperature', () => {
     expect(doublingTimeHours(4)).toBeGreaterThan(20);
   });
@@ -122,6 +129,12 @@ describe('calcTiming', () => {
     expect(cold).toBeGreaterThan(calcTiming(r111, 24).peakHours * 2);
   });
 
+  it('takes 2 to 4 days for rye-whole 1:1:1 at 7 °C in the fridge (regression)', () => {
+    const t = calcTiming(r111, 7, 'rye-whole');
+    expect(t.peakHours).toBeGreaterThanOrEqual(48);
+    expect(t.peakHours).toBeLessThanOrEqual(96);
+  });
+
   it('is faster with high hydration, slower with low hydration', () => {
     const base = calcTiming(r111, 24).peakHours;
     expect(calcTiming({ flour: 1, water: 2, starter: 1 }, 24).peakHours).toBeLessThan(base);
@@ -142,7 +155,9 @@ describe('calcTiming', () => {
   });
 
   it('gives exact values at the temperature limits', () => {
-    expect(calcTiming(r111, 4).peakHours).toBeCloseTo(3.5 * 2 ** (20 / 7) * Math.log2(3), 5);
+    const baseAt12 = 3.5 * 2 ** ((24 - 12) / 7);
+    const doublingAt4 = baseAt12 * 2 ** ((12 - 4) / 2.1);
+    expect(calcTiming(r111, 4).peakHours).toBeCloseTo(doublingAt4 * Math.log2(3), 5);
     expect(calcTiming(r111, 38).peakHours).toBeCloseTo(3.5 * 2 ** (-14 / 7) * Math.log2(3), 5);
   });
 
