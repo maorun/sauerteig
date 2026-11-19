@@ -40,8 +40,15 @@ export interface Phase {
 /** Doubling time of a 1:1:1 refreshment at the reference temperature. */
 const REF_DOUBLING_H = 3.5;
 const REF_TEMP_C = 24;
-/** Temperature change that halves or doubles the speed. */
+/** Temperature change that halves or doubles the speed in the ambient range (>= 12 °C). */
 const TEMP_STEP_C = 7;
+/**
+ * Threshold below which cold-induced dormancy (Kältestarre) slows microbial activity
+ * non-linearly. Below this temperature, metabolic activity drops much faster.
+ */
+export const COLD_TEMP_THRESHOLD_C = 12;
+/** Temperature drop that halves the speed below COLD_TEMP_THRESHOLD_C. */
+export const COLD_TEMP_STEP_C = 2.1;
 export const MIN_TEMP_C = 4;
 export const MAX_TEMP_C = 38;
 /** Peak lies at the point where the volume has tripled (log2(3) doublings). */
@@ -109,6 +116,10 @@ export function parseRatio(text: string): Ratio | null {
 
 export function doublingTimeHours(tempC: number): number {
   const t = Math.min(MAX_TEMP_C, Math.max(MIN_TEMP_C, tempC));
+  if (t < COLD_TEMP_THRESHOLD_C) {
+    const baseAtThreshold = REF_DOUBLING_H * Math.pow(2, (REF_TEMP_C - COLD_TEMP_THRESHOLD_C) / TEMP_STEP_C);
+    return baseAtThreshold * Math.pow(2, (COLD_TEMP_THRESHOLD_C - t) / COLD_TEMP_STEP_C);
+  }
   return REF_DOUBLING_H * Math.pow(2, (REF_TEMP_C - t) / TEMP_STEP_C);
 }
 
