@@ -12,6 +12,7 @@ import {
   parseInventoryGrams,
   parseStarterInventory,
   serializeStarterInventory,
+  getDeadlineStatus,
   getPhase,
   MAX_RATIO_PART,
   MAX_TEMP_C,
@@ -166,6 +167,8 @@ function showError(msg: string | null): void {
   $('bar').setAttribute('aria-valuenow', '0');
   $('bar-fill').style.width = '0%';
   $('countdown').textContent = '–';
+  $('deadline').textContent = '–';
+  delete $('deadline').dataset.level;
 }
 
 function render(): void {
@@ -220,6 +223,18 @@ function render(): void {
         : toPeak > 0
           ? `Noch ${fmtDuration(toPeak)} bis Peak`
           : `Peak vor ${fmtDuration(-toPeak)} erreicht`;
+    const deadline = getDeadlineStatus(elapsed, timing);
+    const deadlineEl = $('deadline');
+    deadlineEl.dataset.level = deadline.level;
+    const at = fmtTime.format(schedule.windowEnd);
+    deadlineEl.textContent =
+      deadline.level === 'overdue'
+        ? `⚠ Frist überschritten seit ${fmtDuration(-deadline.hoursLeft)} – Säure staut sich, ASG verhungert. Sofort füttern!`
+        : deadline.level === 'urgent'
+          ? `⚠ Jetzt füttern! Frist ${at} – noch ${fmtDuration(deadline.hoursLeft)}, danach verhungert die ASG`
+          : deadline.level === 'soon'
+            ? `⚠ Spätestens ${at} füttern – noch ${fmtDuration(deadline.hoursLeft)}`
+            : `Füttern spätestens ${at} (in ${fmtDuration(deadline.hoursLeft)})`;
   };
   update();
   tick = window.setInterval(update, 1000);

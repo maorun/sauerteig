@@ -21,14 +21,6 @@ Rules for this file:
 
 ## Priority 3
 
-### Focus on refresh deadline and over-fermentation (`refresh-deadline-focus`)
-
-- **Rank:** Feature model. Total 22/40 (baking 8, usability 6, harmony 5, safety 3). Effort S. Estimate.
-- **Code:** `src/calc.ts`, `src/calc.test.ts`, `src/main.ts`, `index.html`.
-- **Problem:** The UI emphasizes the peak time, but does not sufficiently warn against the critical deadline where the starter degrades and starves.
-- **Goal:** Prominently display the mandatory refresh deadline and starvation threshold with a clear visual warning indicator and remaining time.
-- **Acceptance test:** The schedule and countdown prominently display the deadline for re-feeding before acid accumulation ruins the culture.
-
 ## Priority 4
 
 ### Fridge storage and feeding schedules (`fridge-storage-schedules`)
