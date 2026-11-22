@@ -436,3 +436,55 @@ export function calcCombinedSchedule(schedule: Schedule, duration: FridgeDuratio
     fridgeEnd: new Date(windowEnd.getTime() + FRIDGE_OPTIONS[duration].days * 24 * 3_600_000),
   };
 }
+
+/** One refreshment of the feeding log. */
+export interface FeedingEntry {
+  /** ISO timestamp of the refreshment. */
+  at: string;
+  ratio: Ratio;
+  tempC: number;
+  flour: FlourType;
+}
+
+/** The log keeps only the newest entries. */
+export const MAX_FEEDING_LOG = 20;
+
+function isFeedingEntry(value: unknown): value is FeedingEntry {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const { at, ratio, tempC, flour } = value as Record<string, unknown>;
+  if (typeof at !== 'string' || !ISO_TIMESTAMP.test(at) || Number.isNaN(new Date(at).getTime())) return false;
+  if (typeof ratio !== 'object' || ratio === null || Array.isArray(ratio)) return false;
+  const r = ratio as Record<string, unknown>;
+  const isPart = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= MAX_RATIO_PART;
+  if (!isPart(r.flour) || !isPart(r.water) || !isPart(r.starter)) return false;
+  if (typeof tempC !== 'number' || !Number.isFinite(tempC) || tempC < MIN_TEMP_C || tempC > MAX_TEMP_C) return false;
+  return isFlourType(flour);
+}
+
+/** Appends an entry (oldest first) and drops the oldest entries above MAX_FEEDING_LOG. Does not change the input. */
+export function addFeedingEntry(log: readonly FeedingEntry[], entry: FeedingEntry): FeedingEntry[] {
+  if (!isFeedingEntry(entry)) throw new RangeError('invalid feeding entry');
+  return [...log, { at: entry.at, ratio: { ...entry.ratio }, tempC: entry.tempC, flour: entry.flour }].slice(-MAX_FEEDING_LOG);
+}
+
+/** Parses the stored log. Returns null for missing or corrupt data, so the caller starts with an empty log. */
+export function parseFeedingLog(raw: string | null): FeedingEntry[] | null {
+  if (raw === null) return null;
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(data) || data.length > MAX_FEEDING_LOG || !data.every(isFeedingEntry)) return null;
+  return data.map((e) => ({ at: e.at, ratio: { ...e.ratio }, tempC: e.tempC, flour: e.flour }));
+}
+
+export function serializeFeedingLog(log: readonly FeedingEntry[]): string {
+  return JSON.stringify(log.map((e) => ({ at: e.at, ratio: e.ratio, tempC: e.tempC, flour: e.flour })));
+}
+
+/** Hours between each entry and the one before it. The first entry has null. A clock change gives 0, never a negative value. */
+export function feedingIntervals(log: readonly FeedingEntry[]): (number | null)[] {
+  return log.map((e, i) => (i === 0 ? null : Math.max(0, new Date(e.at).getTime() - new Date(log[i - 1].at).getTime()) / 3_600_000));
+}
