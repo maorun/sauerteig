@@ -55,6 +55,32 @@
         <p id="error" role="alert" class="error" hidden></p>
       </form>
 
+      <section class="card" aria-labelledby="h-inv">
+        <h2 id="h-inv">Anstellgut-Vorrat</h2>
+        <form id="inv-form" novalidate>
+          <label>Vorhandenes ASG (g)
+            <input id="inv-grams" type="number" inputmode="decimal" min="0" max="1000000" step="any" />
+          </label>
+          <label>Mehlsorte des ASG
+            <select id="inv-flour">
+              <option value="rye-whole">Roggenvollkornmehl</option>
+              <option value="rye">Roggenmehl (Type 997/1150)</option>
+              <option value="wheat-whole">Weizenvollkornmehl</option>
+              <option value="spelt">Dinkelmehl</option>
+              <option value="wheat-white" selected>Weizenmehl (Type 550)</option>
+            </select>
+          </label>
+          <label>Zuletzt aufgefrischt
+            <input id="inv-time" type="datetime-local" />
+          </label>
+          <p id="inv-error" role="alert" class="error" hidden></p>
+        </form>
+        <p id="inv-warning" class="error" role="status" hidden></p>
+        <div class="row">
+          <button id="btn-inv-refreshed" type="button">Jetzt aufgefrischt</button>
+        </div>
+      </section>
+
       <section class="card" aria-labelledby="h-amounts">
         <h2 id="h-amounts">Zutaten</h2>
         <dl class="grid">

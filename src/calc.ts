@@ -233,3 +233,62 @@ export function calcTargetOptions(
   }
   return options;
 }
+
+/** Starter stock of the baker, as stored between sessions. */
+export interface StarterInventory {
+  /** Available starter in grams. */
+  grams: number;
+  flour: FlourType;
+  /** ISO timestamp of the last refreshment, null if the baker has not set one. */
+  refreshedAt: string | null;
+}
+
+export const MAX_INVENTORY_G = 1_000_000;
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
+
+/** Parses a gram input. Returns null unless it is a decimal number from 0 to MAX_INVENTORY_G. */
+export function parseInventoryGrams(value: unknown): number | null {
+  let n = value;
+  if (typeof value === 'string') {
+    const text = value.trim().replace(',', '.');
+    n = /^(\d+(\.\d*)?|\.\d+)$/.test(text) ? Number(text) : NaN;
+  }
+  return typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= MAX_INVENTORY_G ? n : null;
+}
+
+/** Parses stored inventory JSON. Returns null for missing, corrupt or out-of-range data. */
+export function parseStarterInventory(raw: string | null): StarterInventory | null {
+  if (raw === null) return null;
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return null;
+  const { grams, flour, refreshedAt } = data as Record<string, unknown>;
+  if (typeof grams !== 'number' || parseInventoryGrams(grams) === null) return null;
+  if (!isFlourType(flour)) return null;
+  if (refreshedAt === null) return { grams, flour, refreshedAt: null };
+  // Only a canonical ISO string passes, so a tampered loose date string cannot load a wrong time.
+  if (typeof refreshedAt !== 'string' || !ISO_TIMESTAMP.test(refreshedAt) || Number.isNaN(new Date(refreshedAt).getTime())) {
+    return null;
+  }
+  return { grams, flour, refreshedAt };
+}
+
+export function serializeStarterInventory(inventory: StarterInventory): string {
+  return JSON.stringify({ grams: inventory.grams, flour: inventory.flour, refreshedAt: inventory.refreshedAt });
+}
+
+export interface SupplyCheck {
+  sufficient: boolean;
+  /** Missing starter in whole grams, 0 if the supply is sufficient. */
+  shortfall: number;
+}
+
+/** Compares the available starter with the amount a refreshment needs. */
+export function checkStarterSupply(available: number, needed: number): SupplyCheck {
+  const shortfall = Math.max(0, Math.ceil(needed - available));
+  return { sufficient: shortfall === 0, shortfall };
+}

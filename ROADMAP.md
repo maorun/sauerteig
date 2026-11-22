@@ -21,14 +21,6 @@ Rules for this file:
 
 ## Priority 3
 
-### Starter inventory persistence (`starter-inventory-storage`)
-
-- **Rank:** Feature model. Total 23/40 (baking 8, usability 6, harmony 5, safety 4). Effort M. Estimate.
-- **Code:** `index.html`, `src/main.ts`, `src/calc.ts`.
-- **Problem:** Bakers cannot persist the available amount and refreshment state of their starter culture between baking sessions.
-- **Goal:** Allow bakers to store available starter weight, flour type, and refreshment timestamp in `localStorage`, and alert when supply is low.
-- **Acceptance test:** A dedicated starter card persists starter amount and timestamp across page reloads and warns when available starter is insufficient.
-
 ### Focus on refresh deadline and over-fermentation (`refresh-deadline-focus`)
 
 - **Rank:** Feature model. Total 22/40 (baking 8, usability 6, harmony 5, safety 3). Effort S. Estimate.

@@ -7,6 +7,11 @@ import {
   DEFAULT_FLOUR,
   FLOUR_LABELS,
   isFlourType,
+  checkStarterSupply,
+  MAX_INVENTORY_G,
+  parseInventoryGrams,
+  parseStarterInventory,
+  serializeStarterInventory,
   getPhase,
   MAX_RATIO_PART,
   MAX_TEMP_C,
@@ -21,6 +26,7 @@ import { nextTab, TAB_NAMES, type TabName } from './tabs';
 
 const STORE_KEY = 'sauerteig:start';
 const FLOUR_KEY = 'sauerteig:flour';
+const INVENTORY_KEY = 'sauerteig:inventory';
 const MAX_TOTAL_G = 1_000_000;
 
 const $ = <T extends HTMLElement>(id: string): T => {
@@ -80,9 +86,9 @@ const store = {
       /* no persistence available */
     }
   },
-  clear(): void {
+  clear(key = STORE_KEY): void {
     try {
-      localStorage.removeItem(STORE_KEY);
+      localStorage.removeItem(key);
     } catch {
       /* no persistence available */
     }
@@ -96,6 +102,54 @@ const savedFlour = store.get(FLOUR_KEY);
 const initialFlour: FlourType = isFlourType(savedFlour) ? savedFlour : DEFAULT_FLOUR;
 flourEl.value = initialFlour;
 
+// --- Starter inventory ---
+const invGramsEl = $<HTMLInputElement>('inv-grams');
+const invFlourEl = $<HTMLSelectElement>('inv-flour');
+const invTimeEl = $<HTMLInputElement>('inv-time');
+const invErrorEl = $('inv-error');
+const invWarningEl = $('inv-warning');
+
+const savedInventory = parseStarterInventory(store.get(INVENTORY_KEY));
+if (savedInventory) {
+  invGramsEl.value = String(savedInventory.grams);
+  invFlourEl.value = savedInventory.flour;
+  if (savedInventory.refreshedAt) invTimeEl.value = toLocalInput(new Date(savedInventory.refreshedAt));
+}
+
+/** Warns when the stored starter does not cover the starter amount of the current mix. */
+function updateSupplyWarning(needed: number | null): void {
+  const grams = parseInventoryGrams(invGramsEl.value);
+  const warn = needed !== null && grams !== null ? checkStarterSupply(grams, needed) : null;
+  invWarningEl.hidden = warn === null || warn.sufficient;
+  invWarningEl.textContent =
+    warn === null || warn.sufficient ? '' : `ASG reicht nicht: ${needed} g nötig, ${warn.shortfall} g fehlen.`;
+}
+
+function saveInventory(): void {
+  // An empty field removes the stored stock, so a reload does not show an outdated amount.
+  if (invGramsEl.value.trim() === '') {
+    invErrorEl.hidden = true;
+    invErrorEl.textContent = '';
+    store.clear(INVENTORY_KEY);
+    return;
+  }
+  const grams = parseInventoryGrams(invGramsEl.value);
+  if (grams === null) {
+    invErrorEl.hidden = false;
+    invErrorEl.textContent = `Vorrat muss zwischen 0 und ${MAX_INVENTORY_G} g liegen.`;
+    // Drop the stored stock, so a reload does not restore a value the field no longer shows.
+    store.clear(INVENTORY_KEY);
+    return;
+  }
+  invErrorEl.hidden = true;
+  invErrorEl.textContent = '';
+  // The timestamp stays empty until the baker sets it, so no refreshment time is invented.
+  const refreshed = new Date(invTimeEl.value);
+  const refreshedAt = Number.isNaN(refreshed.getTime()) ? null : refreshed.toISOString();
+  const flour: FlourType = isFlourType(invFlourEl.value) ? invFlourEl.value : DEFAULT_FLOUR;
+  store.set(serializeStarterInventory({ grams, flour, refreshedAt }), INVENTORY_KEY);
+}
+
 let tick: number | undefined;
 
 const OUTPUT_IDS = ['o-flour', 'o-water', 'o-starter', 'o-doubling', 'o-peak', 's-start', 's-peak', 's-end'];
@@ -104,6 +158,7 @@ function showError(msg: string | null): void {
   errorEl.hidden = msg === null;
   errorEl.textContent = msg ?? '';
   if (msg === null) return;
+  updateSupplyWarning(null);
   // Clear stale results so the page never shows values for invalid input.
   for (const id of OUTPUT_IDS) $(id).textContent = '–';
   $('phase-name').textContent = '–';
@@ -134,6 +189,7 @@ function render(): void {
   if (amounts.flour < 1 || amounts.water < 1 || amounts.starter < 1) {
     return showError('Menge zu klein für dieses Verhältnis. Menge erhöhen.');
   }
+  updateSupplyWarning(amounts.starter);
   const timing = calcTiming(ratio, temp, getFlour(flourEl));
   const schedule = buildSchedule(start, timing);
 
@@ -200,6 +256,22 @@ $('btn-reset').addEventListener('click', () => {
   store.clear();
   startEl.value = toLocalInput(new Date());
   render();
+});
+
+$('inv-form').addEventListener('input', () => {
+  saveInventory();
+  render();
+});
+$('inv-form').addEventListener('submit', (e) => e.preventDefault());
+$('btn-inv-refreshed').addEventListener('click', () => {
+  // Without a valid amount nothing gets stored, so the button must not show a time that a reload loses.
+  if (parseInventoryGrams(invGramsEl.value) === null) {
+    invErrorEl.hidden = false;
+    invErrorEl.textContent = `Zuerst Vorrat zwischen 0 und ${MAX_INVENTORY_G} g eingeben.`;
+    return;
+  }
+  invTimeEl.value = toLocalInput(new Date());
+  saveInventory();
 });
 
 // --- Target time calculator ---

@@ -35,6 +35,12 @@ describe('index.html structure', () => {
     expect(html).toMatch(/id="panel-target"[^>]*\bhidden\b/);
     expect(html).not.toMatch(/id="panel-tracker"[^>]*\bhidden\b/);
   });
+  it('has a starter inventory card with warning in the tracker panel', () => {
+    const tracker = panel('tracker');
+    for (const id of ['inv-grams', 'inv-flour', 'inv-time', 'inv-warning', 'btn-inv-refreshed']) {
+      expect(tracker).toContain(`id="${id}"`);
+    }
+  });
   it('keeps the target calculator out of the tracker panel', () => {
     const tracker = panel('tracker');
     expect(tracker).toContain('id="form"');

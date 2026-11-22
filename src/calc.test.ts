@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildSchedule,
+  checkStarterSupply,
+  parseInventoryGrams,
+  parseStarterInventory,
+  serializeStarterInventory,
+  MAX_INVENTORY_G,
   calcTargetOptions,
   MIN_STARTER_SHARE,
   MAX_STARTER_SHARE,
@@ -371,5 +376,75 @@ describe('flour types', () => {
         calcTargetOptions(at(10), start, 1000, TARGET_TEMPS_C, 'wheat-white'),
       );
     });
+  });
+});
+
+describe('starter inventory', () => {
+  const inv = { grams: 120, flour: 'rye' as FlourType, refreshedAt: '2026-11-20T08:00:00.000Z' };
+
+  it('round-trips through serialization', () => {
+    expect(parseStarterInventory(serializeStarterInventory(inv))).toEqual(inv);
+  });
+  it('rejects missing, corrupt and invalid data', () => {
+    expect(parseStarterInventory(null)).toBeNull();
+    expect(parseStarterInventory('not json')).toBeNull();
+    expect(parseStarterInventory('42')).toBeNull();
+    expect(parseStarterInventory(JSON.stringify({ ...inv, grams: -1 }))).toBeNull();
+    expect(parseStarterInventory(JSON.stringify({ ...inv, grams: MAX_INVENTORY_G + 1 }))).toBeNull();
+    expect(parseStarterInventory(JSON.stringify({ ...inv, grams: '120' }))).toBeNull();
+    expect(parseStarterInventory(JSON.stringify({ ...inv, flour: 'corn' }))).toBeNull();
+    expect(parseStarterInventory(JSON.stringify({ ...inv, refreshedAt: 'yesterday' }))).toBeNull();
+  });
+  it('rejects arrays and a missing timestamp field', () => {
+    expect(parseStarterInventory('[]')).toBeNull();
+    expect(parseStarterInventory(JSON.stringify({ grams: 1, flour: 'rye' }))).toBeNull();
+  });
+  it('keeps an unset timestamp as null', () => {
+    const unset = { ...inv, refreshedAt: null };
+    expect(parseStarterInventory(serializeStarterInventory(unset))).toEqual(unset);
+  });
+  it('round-trips each flour type', () => {
+    for (const flour of FLOUR_TYPES) {
+      expect(parseStarterInventory(serializeStarterInventory({ ...inv, flour }))?.flour).toBe(flour);
+    }
+  });
+  it('parses gram input within bounds only', () => {
+    expect(parseInventoryGrams('12,5')).toBe(12.5);
+    expect(parseInventoryGrams('0')).toBe(0);
+    expect(parseInventoryGrams('')).toBeNull();
+    expect(parseInventoryGrams('abc')).toBeNull();
+    expect(parseInventoryGrams('-1')).toBeNull();
+    expect(parseInventoryGrams(String(MAX_INVENTORY_G + 1))).toBeNull();
+  });
+  it('rejects hex, exponent and non-finite gram input', () => {
+    for (const bad of ['0x10', '1e3', 'Infinity', NaN, Infinity, null, undefined]) {
+      expect(parseInventoryGrams(bad)).toBeNull();
+    }
+    expect(parseInventoryGrams(25)).toBe(25);
+  });
+  it('accepts a leading dot in gram input', () => {
+    expect(parseInventoryGrams('.5')).toBe(0.5);
+  });
+  it('rejects inherited flour names and invalid timestamps', () => {
+    for (const flour of ['toString', '__proto__', 'constructor']) {
+      expect(parseStarterInventory(JSON.stringify({ ...inv, flour }))).toBeNull();
+    }
+    expect(parseStarterInventory(JSON.stringify({ ...inv, refreshedAt: 5 }))).toBeNull();
+    expect(parseStarterInventory(JSON.stringify({ ...inv, refreshedAt: '2026-13-45T99:99:99.000Z' }))).toBeNull();
+  });
+  it('rejects a loose timestamp string', () => {
+    expect(parseStarterInventory(JSON.stringify({ ...inv, refreshedAt: '1' }))).toBeNull();
+    expect(parseStarterInventory(JSON.stringify({ ...inv, refreshedAt: 'Nov 20 2026' }))).toBeNull();
+  });
+  it('accepts an empty stock of 0 g', () => {
+    expect(parseStarterInventory(serializeStarterInventory({ ...inv, grams: 0 }))?.grams).toBe(0);
+  });
+  it('warns when the supply is below the needed starter', () => {
+    expect(checkStarterSupply(20, 50)).toEqual({ sufficient: false, shortfall: 30 });
+    expect(checkStarterSupply(49.5, 50)).toEqual({ sufficient: false, shortfall: 1 });
+  });
+  it('accepts an equal or larger supply', () => {
+    expect(checkStarterSupply(50, 50)).toEqual({ sufficient: true, shortfall: 0 });
+    expect(checkStarterSupply(80, 50)).toEqual({ sufficient: true, shortfall: 0 });
   });
 });
