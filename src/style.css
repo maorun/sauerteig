@@ -7,6 +7,7 @@
   --accent-text: #ffffff;
   --border: #d9c7ad;
   --error: #a4161a;
+  --warn: #8a5a00;
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -19,6 +20,7 @@
     --accent-text: #1c140d;
     --border: #5a4631;
     --error: #ff8a8d;
+    --warn: #ffd37a;
   }
 }
 * { box-sizing: border-box; }
@@ -60,6 +62,11 @@ dd { margin: 0; font-size: 1.4rem; font-weight: 700; }
 .bar { height: 1rem; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
 .bar-fill { height: 100%; width: 0; background: var(--accent); transition: width 0.5s; }
 .countdown { font-size: 1.3rem; font-variant-numeric: tabular-nums; margin: 0.75rem 0; }
+.deadline { margin: 0 0 0.75rem; padding: 0.6rem; border: 2px solid var(--border); border-radius: 0.5rem; font-weight: 700; }
+.deadline[data-level="soon"] { border-color: var(--warn); color: var(--warn); }
+.deadline[data-level="urgent"] { border-color: var(--error); color: var(--error); }
+.deadline[data-level="overdue"] { border-color: var(--error); background: var(--error); color: var(--card); }
+.deadline-row span, .deadline-row time { font-weight: 700; color: var(--warn); }
 .row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 button {
   font: inherit; font-weight: 700; min-height: 2.75rem; padding: 0.5rem 1rem; border-radius: 0.5rem;

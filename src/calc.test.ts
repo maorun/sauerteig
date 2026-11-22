@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildSchedule,
+  getDeadlineStatus,
   checkStarterSupply,
   parseInventoryGrams,
   parseStarterInventory,
@@ -446,5 +447,29 @@ describe('starter inventory', () => {
   it('accepts an equal or larger supply', () => {
     expect(checkStarterSupply(50, 50)).toEqual({ sufficient: true, shortfall: 0 });
     expect(checkStarterSupply(80, 50)).toEqual({ sufficient: true, shortfall: 0 });
+  });
+});
+
+describe('getDeadlineStatus', () => {
+  const timing = { doublingHours: 4, peakHours: 8, windowEndHours: 12 };
+  it('is ok before the peak and reports the time to the deadline', () => {
+    expect(getDeadlineStatus(2, timing)).toEqual({ level: 'ok', hoursLeft: 10 });
+  });
+  it('warns after the peak', () => {
+    expect(getDeadlineStatus(9, timing)).toEqual({ level: 'soon', hoursLeft: 3 });
+  });
+  it('turns urgent within a quarter of the peak time before the deadline', () => {
+    expect(getDeadlineStatus(10, timing).level).toBe('urgent');
+    expect(getDeadlineStatus(12, timing)).toEqual({ level: 'urgent', hoursLeft: 0 });
+  });
+  it('switches level exactly at the boundaries', () => {
+    expect(getDeadlineStatus(8, timing).level).toBe('soon');
+    expect(getDeadlineStatus(7.99, timing).level).toBe('ok');
+    expect(getDeadlineStatus(10, timing).level).toBe('urgent'); // 2 h left = 25 % of the peak time
+    expect(getDeadlineStatus(9.99, timing).level).toBe('soon');
+    expect(getDeadlineStatus(-2, timing)).toEqual({ level: 'ok', hoursLeft: 14 });
+  });
+  it('is overdue after the deadline with negative time left', () => {
+    expect(getDeadlineStatus(13, timing)).toEqual({ level: 'overdue', hoursLeft: -1 });
   });
 });

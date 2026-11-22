@@ -103,7 +103,7 @@
         <ul class="schedule">
           <li><span>Start</span><time id="s-start"></time></li>
           <li><span>Peak</span><time id="s-peak"></time></li>
-          <li><span>Lagerfenster bis</span><time id="s-end"></time></li>
+          <li class="deadline-row"><span>Spätestens füttern</span><time id="s-end"></time></li>
         </ul>
       </section>
 
@@ -114,6 +114,7 @@
           <div id="bar-fill" class="bar-fill"></div>
         </div>
         <p id="countdown" class="countdown" aria-live="off">–</p>
+        <p id="deadline" class="deadline" aria-live="off">–</p>
         <div class="row">
           <button id="btn-start" type="button">Jetzt füttern</button>
           <button id="btn-reset" type="button" class="secondary">Zurücksetzen</button>

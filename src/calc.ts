@@ -171,6 +171,30 @@ export function getPhase(elapsedHours: number, timing: Timing): Phase {
   return { name: 'growth', progress };
 }
 
+export type DeadlineLevel = 'ok' | 'soon' | 'urgent' | 'overdue';
+
+export interface DeadlineStatus {
+  level: DeadlineLevel;
+  /** Hours until the refresh deadline (the end of the window). Negative if passed. */
+  hoursLeft: number;
+}
+
+/** Share of the peak time before the deadline at which the warning turns urgent. */
+const URGENT_BAND = 0.25;
+
+/**
+ * Rates the time left until the refresh deadline (windowEndHours), where acid builds up
+ * and the culture starves. `ok` before the peak, `soon` after the peak, `urgent` shortly
+ * before the deadline and `overdue` after it.
+ */
+export function getDeadlineStatus(elapsedHours: number, timing: Timing): DeadlineStatus {
+  const hoursLeft = timing.windowEndHours - elapsedHours;
+  if (hoursLeft < 0) return { level: 'overdue', hoursLeft };
+  if (hoursLeft <= timing.peakHours * URGENT_BAND) return { level: 'urgent', hoursLeft };
+  if (elapsedHours >= timing.peakHours) return { level: 'soon', hoursLeft };
+  return { level: 'ok', hoursLeft };
+}
+
 export function splitHours(hours: number): { hours: number; minutes: number } {
   const total = Math.round(Math.max(0, hours) * 60);
   return { hours: Math.floor(total / 60), minutes: total % 60 };
