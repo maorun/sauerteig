@@ -16,6 +16,7 @@ import {
   type PhaseName,
   type TargetOption,
 } from './calc';
+import { nextTab, TAB_NAMES, type TabName } from './tabs';
 
 const STORE_KEY = 'sauerteig:start';
 const FLOUR_KEY = 'sauerteig:flour';
@@ -288,13 +289,36 @@ tBodyEl.addEventListener('click', (e) => {
   startEl.value = toLocalInput(tStartUsed);
   store.set(tStartUsed.toISOString());
   render();
-  setTargetStatus(`Option ${fmtNum(o.tempC)} °C übernommen.`);
+  // The tracker panel shows the result. A status in the hidden target panel would stay silent.
+  selectTab('tracker');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const heading = $('h-amounts');
   heading.tabIndex = -1;
   heading.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
   heading.focus({ preventScroll: true });
 });
+
+// --- Tabs ---
+function selectTab(name: TabName, focus = false): void {
+  for (const n of TAB_NAMES) {
+    const tab = $(`tab-${n}`);
+    const active = n === name;
+    tab.setAttribute('aria-selected', String(active));
+    tab.tabIndex = active ? 0 : -1;
+    $(`panel-${n}`).hidden = !active;
+    if (active && focus) tab.focus();
+  }
+}
+for (const n of TAB_NAMES) {
+  $(`tab-${n}`).addEventListener('click', () => selectTab(n));
+  $(`tab-${n}`).addEventListener('keydown', (e) => {
+    const next = nextTab(n, e.key);
+    if (!next) return;
+    e.preventDefault();
+    selectTab(next, true);
+  });
+}
+
 const tFormEl = $('target-form');
 tFormEl.addEventListener('input', (e) => {
   if (e.target === tFlourEl) setFlour(getFlour(tFlourEl));
