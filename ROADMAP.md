@@ -19,14 +19,6 @@ Rules for this file:
 
 ## Priority 2
 
-### Send a notification at the peak and before the feed deadline (`peak-deadline-notifications`)
-
-- **Rank:** Feature model. Total 26/40 (baking 8, usability 5, harmony 6, safety 7). Effort L. Estimate.
-- **Code:** `src/main.ts`, `public/sw.js`, `src/sw.test.ts`, `index.html`.
-- **Problem:** The phase and the deadline warning show only when the page is open. If the baker closes the app, the starter can pass the window end without a warning and starve.
-- **Goal:** Add an opt-in button that requests the notification permission. Show a notification at the peak and at the start of the `urgent` deadline level. Cancel the notifications when the user resets or feeds again. Tell the user when the browser does not support the feature.
-- **Acceptance test:** Unit tests calculate the two notification times from a schedule and cancel them after a reset. A test for the service worker shows a notification with the correct text. A manual test on a phone shows the notification with the app in the background.
-
 ## Priority 3
 
 ### Move the input validation out of `main.ts` and test it (`extract-form-validation`)
