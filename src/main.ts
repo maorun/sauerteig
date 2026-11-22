@@ -21,6 +21,11 @@ import {
   getPhase,
   splitHours,
   type FlourType,
+  type FeedingEntry,
+  addFeedingEntry,
+  feedingIntervals,
+  parseFeedingLog,
+  serializeFeedingLog,
   type PhaseName,
   type TargetOption,
 } from './calc';
@@ -44,6 +49,7 @@ const FLOUR_KEY = 'sauerteig:flour';
 const INVENTORY_KEY = 'sauerteig:inventory';
 const TRACKER_KEY = 'sauerteig:tracker';
 const NOTIFY_KEY = 'sauerteig:notify';
+const LOG_KEY = 'sauerteig:log';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -372,13 +378,48 @@ startEl.addEventListener('change', () => {
   else store.set(d.toISOString());
   render();
 });
+// --- Feeding log ---
+// A corrupt stored log starts empty.
+let feedingLog: FeedingEntry[] = parseFeedingLog(store.get(LOG_KEY)) ?? [];
+const logListEl = $('log-list');
+const logEmptyEl = $('log-empty');
+
+function renderLog(): void {
+  logListEl.replaceChildren();
+  logEmptyEl.hidden = feedingLog.length > 0;
+  const gaps = feedingIntervals(feedingLog);
+  // Newest entry first.
+  for (let i = feedingLog.length - 1; i >= 0; i--) {
+    const e = feedingLog[i];
+    const gap = gaps[i];
+    const li = document.createElement('li');
+    li.textContent =
+      `${fmtDateTime.format(new Date(e.at))} – ${e.ratio.flour} : ${e.ratio.water} : ${e.ratio.starter}, ` +
+      `${fmtNum(e.tempC)} °C, ${FLOUR_LABELS[e.flour]}` +
+      (gap === null ? '' : ` – ${fmtDuration(gap)} nach der vorigen Fütterung`);
+    logListEl.append(li);
+  }
+}
+
+function logFeeding(at: Date): void {
+  // Only valid inputs make an entry, so the log never holds a value the tracker rejects.
+  const ratio = validateRatio(ratioFlourEl.value, ratioWaterEl.value, ratioStarterEl.value);
+  const temp = validateTemp(tempEl.value);
+  if (!ratio.ok || !temp.ok) return;
+  feedingLog = addFeedingEntry(feedingLog, { at: at.toISOString(), ratio: ratio.value, tempC: temp.value, flour: getFlour(flourEl) });
+  store.set(serializeFeedingLog(feedingLog), LOG_KEY);
+  renderLog();
+}
+
 $('btn-start').addEventListener('click', () => {
   const now = new Date();
   startEl.value = toLocalInput(now);
   store.set(now.toISOString());
+  logFeeding(now);
   render();
 });
 $('btn-reset').addEventListener('click', () => {
+  // The reset keeps the feeding log. It records past feedings, not the running refreshment.
   store.clear();
   notifier.cancel();
   startEl.value = toLocalInput(new Date());
@@ -570,6 +611,7 @@ tFormEl.addEventListener('submit', (e) => e.preventDefault());
 updateNotifyUi();
 render();
 renderFridge();
+renderLog();
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   // Reload when a new worker takes over, so the page runs the new release.

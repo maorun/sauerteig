@@ -23,14 +23,6 @@ Rules for this file:
 
 ## Priority 4
 
-### Record a feeding log with the last refreshments (`feeding-log`)
-
-- **Rank:** Feature model. Total 20/40 (baking 6, usability 5, harmony 5, safety 4). Effort M. Estimate.
-- **Code:** `src/calc.ts`, `src/calc.test.ts`, `src/main.ts`, `index.html`.
-- **Problem:** The app forgets each refreshment when the user starts a new one. The baker cannot compare the calculated peak with the real peak, and cannot see how often the starter got food in the last days.
-- **Goal:** Store a log entry with time, ratio, temperature and flour type for each "Jetzt füttern" click. Keep the last 20 entries. Show the log in a list with the time since the previous entry.
-- **Acceptance test:** Unit tests add entries, drop the oldest entry after 20 entries and reject corrupt stored data. A manual test feeds two times and sees two entries in the correct order after a reload.
-
 ## Priority 5
 
 ## Rules for ranking

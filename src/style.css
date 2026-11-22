@@ -86,4 +86,6 @@ table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nu
 th, td { text-align: left; padding: 0.5rem 0.4rem; border-bottom: 1px solid var(--border); white-space: nowrap; }
 th { color: var(--muted); font-size: 0.85rem; }
 td button { flex: none; min-width: 2.75rem; padding: 0.4rem 0.75rem; }
+.log-list { margin: 0; padding-left: 1.5rem; }
+.log-list li { padding: 0.35rem 0; }
 @media (prefers-reduced-motion: reduce) { .bar-fill { transition: none; } }

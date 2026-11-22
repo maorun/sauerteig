@@ -38,6 +38,12 @@ import {
   MAX_RATIO_PART,
   parseRatioParts,
   splitHours,
+  addFeedingEntry,
+  feedingIntervals,
+  parseFeedingLog,
+  serializeFeedingLog,
+  MAX_FEEDING_LOG,
+  type FeedingEntry,
 } from './calc';
 
 describe('calcAmounts', () => {
@@ -596,5 +602,69 @@ describe('parseTrackerInputs', () => {
     expect(parseTrackerInputs(raw({ totalG: 0 }))).toBeNull();
     expect(parseTrackerInputs(raw({ totalG: MAX_TOTAL_G + 1 }))).toBeNull();
     expect(parseTrackerInputs('{"flour":1,"water":1,"starter":1e999,"tempC":20,"totalG":150}')).toBeNull();
+  });
+});
+
+describe('feeding log', () => {
+  const entry = (i: number): FeedingEntry => ({
+    at: new Date(Date.UTC(2026, 0, 1, i)).toISOString(),
+    ratio: { flour: 1, water: 1, starter: 1 },
+    tempC: 24,
+    flour: 'wheat-white',
+  });
+
+  it('adds entries oldest first without changing the input', () => {
+    const log: FeedingEntry[] = [];
+    const next = addFeedingEntry(addFeedingEntry(log, entry(0)), entry(1));
+    expect(next.map((e) => e.at)).toEqual([entry(0).at, entry(1).at]);
+    expect(log).toEqual([]);
+  });
+
+  it('drops the oldest entry after 20 entries', () => {
+    let log: FeedingEntry[] = [];
+    for (let i = 0; i < MAX_FEEDING_LOG + 1; i++) log = addFeedingEntry(log, entry(i));
+    expect(log).toHaveLength(MAX_FEEDING_LOG);
+    expect(log[0].at).toBe(entry(1).at);
+    expect(log[MAX_FEEDING_LOG - 1].at).toBe(entry(MAX_FEEDING_LOG).at);
+  });
+
+  it('rejects an invalid entry', () => {
+    expect(() => addFeedingEntry([], { ...entry(0), tempC: 99 })).toThrow(RangeError);
+    expect(() => addFeedingEntry([], { ...entry(0), at: 'yesterday' })).toThrow(RangeError);
+  });
+
+  it('round-trips the stored log', () => {
+    const log = [entry(0), entry(3)];
+    expect(parseFeedingLog(serializeFeedingLog(log))).toEqual(log);
+  });
+
+  it('accepts exactly 20 stored entries', () => {
+    const full = Array.from({ length: MAX_FEEDING_LOG }, (_, i) => entry(i));
+    expect(parseFeedingLog(JSON.stringify(full))).toHaveLength(MAX_FEEDING_LOG);
+  });
+
+  it('round-trips each flour type', () => {
+    const log = FLOUR_TYPES.map((flour, i) => ({ ...entry(i), flour }));
+    expect(parseFeedingLog(serializeFeedingLog(log))).toEqual(log);
+  });
+
+  it('rejects corrupt stored data', () => {
+    const good = entry(0);
+    expect(parseFeedingLog(null)).toBeNull();
+    expect(parseFeedingLog('{oops')).toBeNull();
+    expect(parseFeedingLog('{}')).toBeNull();
+    expect(parseFeedingLog(JSON.stringify([{ ...good, flour: 'corn' }]))).toBeNull();
+    expect(parseFeedingLog(JSON.stringify([{ ...good, at: 'Jan 1 2026' }]))).toBeNull();
+    expect(parseFeedingLog(JSON.stringify([{ ...good, tempC: 'warm' }]))).toBeNull();
+    expect(parseFeedingLog(JSON.stringify([{ ...good, ratio: { flour: 1, water: 0, starter: 1 } }]))).toBeNull();
+    expect(parseFeedingLog(JSON.stringify([good, null]))).toBeNull();
+    const tooMany = Array.from({ length: MAX_FEEDING_LOG + 1 }, (_, i) => entry(i));
+    expect(parseFeedingLog(JSON.stringify(tooMany))).toBeNull();
+  });
+
+  it('gives the hours since the previous entry', () => {
+    expect(feedingIntervals([entry(0), entry(3), entry(4)])).toEqual([null, 3, 1]);
+    expect(feedingIntervals([])).toEqual([]);
+    expect(feedingIntervals([entry(5), entry(3)])).toEqual([null, 0]);
   });
 });
