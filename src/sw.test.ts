@@ -28,6 +28,7 @@ function loadWorker(opts: { online: boolean; cached?: Record<string, string>; ca
     addEventListener: (name: string, fn: Handler) => (handlers[name] = fn),
     skipWaiting: vi.fn(),
     clients: { claim: vi.fn(async () => undefined) },
+    registration: { showNotification: vi.fn(async () => undefined) },
   };
   const cachesApi = {
     open: async () => cache,
@@ -119,5 +120,74 @@ describe('service worker', () => {
     w.handlers.install({ waitUntil: (p: Promise<unknown>) => (done = p) });
     await done;
     expect(w.self.skipWaiting).toHaveBeenCalled();
+  });
+
+  describe('notifications', () => {
+    const item = (tag: string, inMs: number) => ({ tag, at: Date.now() + inMs, title: `T-${tag}`, body: `B-${tag}` });
+
+    it('shows a scheduled notification with the correct text', () => {
+      vi.useFakeTimers();
+      try {
+        const w = loadWorker({ online: true });
+        w.handlers.message({ data: { type: 'schedule', items: [item('peak', 60_000)] } });
+        vi.advanceTimersByTime(59_000);
+        expect(w.self.registration.showNotification).not.toHaveBeenCalled();
+        vi.advanceTimersByTime(2_000);
+        expect(w.self.registration.showNotification).toHaveBeenCalledWith('T-peak', expect.objectContaining({ body: 'B-peak', tag: 'peak' }));
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('shows no notification after a cancel message', () => {
+      vi.useFakeTimers();
+      try {
+        const w = loadWorker({ online: true });
+        w.handlers.message({ data: { type: 'schedule', items: [item('peak', 1_000), item('urgent', 2_000)] } });
+        w.handlers.message({ data: { type: 'cancel' } });
+        vi.advanceTimersByTime(10_000);
+        expect(w.self.registration.showNotification).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('shows one notification when two items share a tag', () => {
+      vi.useFakeTimers();
+      try {
+        const w = loadWorker({ online: true });
+        w.handlers.message({ data: { type: 'schedule', items: [item('peak', 1_000), item('peak', 2_000)] } });
+        vi.advanceTimersByTime(10_000);
+        expect(w.self.registration.showNotification).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('ignores an item with an unknown tag', () => {
+      vi.useFakeTimers();
+      try {
+        const w = loadWorker({ online: true });
+        w.handlers.message({ data: { type: 'schedule', items: [item('other', 1_000)] } });
+        vi.advanceTimersByTime(10_000);
+        expect(w.self.registration.showNotification).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('replaces the old schedule and ignores malformed items', () => {
+      vi.useFakeTimers();
+      try {
+        const w = loadWorker({ online: true });
+        w.handlers.message({ data: { type: 'schedule', items: [item('peak', 1_000)] } });
+        w.handlers.message({ data: { type: 'schedule', items: [{ tag: 'x' }, null, item('urgent', 2_000)] } });
+        vi.advanceTimersByTime(10_000);
+        expect(w.self.registration.showNotification).toHaveBeenCalledTimes(1);
+        expect(w.self.registration.showNotification).toHaveBeenCalledWith('T-urgent', expect.anything());
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });

@@ -195,6 +195,11 @@ export function getDeadlineStatus(elapsedHours: number, timing: Timing): Deadlin
   return { level: 'ok', hoursLeft };
 }
 
+/** Start of the `urgent` deadline level, as hours after the start. */
+export function urgentStartHours(timing: Timing): number {
+  return timing.windowEndHours - timing.peakHours * URGENT_BAND;
+}
+
 export function splitHours(hours: number): { hours: number; minutes: number } {
   const total = Math.round(Math.max(0, hours) * 60);
   return { hours: Math.floor(total / 60), minutes: total % 60 };

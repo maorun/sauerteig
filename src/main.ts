@@ -30,12 +30,14 @@ import {
   type PhaseName,
   type TargetOption,
 } from './calc';
+import { createNotifier, type WorkerMessage } from './notify';
 import { nextTab, TAB_NAMES, type TabName } from './tabs';
 
 const STORE_KEY = 'sauerteig:start';
 const FLOUR_KEY = 'sauerteig:flour';
 const INVENTORY_KEY = 'sauerteig:inventory';
 const TRACKER_KEY = 'sauerteig:tracker';
+const NOTIFY_KEY = 'sauerteig:notify';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -179,12 +181,82 @@ function saveInventory(): void {
 
 let tick: number | undefined;
 
+// --- Notifications ---
+// The service worker shows the notifications, so they appear while the app is in the background.
+// The worker registers only in a production build, so the dev server has no notification support.
+const notifySupported = import.meta.env.PROD && 'Notification' in window && 'serviceWorker' in navigator;
+const notifyBtn = $<HTMLButtonElement>('btn-notify');
+const notifyStatusEl = $('notify-status');
+
+const notifier = createNotifier((message: WorkerMessage) => {
+  if (!notifySupported) return;
+  // A missing active worker rejects, so the notifier sends the plan again on the next call.
+  return navigator.serviceWorker.ready.then((reg) => {
+    if (!reg.active) throw new Error('no active worker');
+    reg.active.postMessage(message);
+  });
+});
+
+// A new worker has no timers. Send the plan again after each takeover.
+if (notifySupported) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    notifier.reset();
+    render();
+  });
+}
+
+// The browser can stop an idle worker and drop its timers. Send the plan again when the page returns.
+document.addEventListener('visibilitychange', () => {
+  if (!notifySupported || document.visibilityState !== 'visible') return;
+  notifier.reset();
+  // The user can change the permission in the browser settings meanwhile.
+  updateNotifyUi();
+  render();
+});
+
+const notifyEnabled = (): boolean => notifySupported && Notification.permission === 'granted' && store.get(NOTIFY_KEY) === 'on';
+
+function updateNotifyUi(): void {
+  if (!notifySupported) {
+    notifyBtn.disabled = true;
+    notifyStatusEl.textContent = 'Dieser Browser unterstützt keine Benachrichtigungen.';
+  } else if (Notification.permission === 'denied') {
+    notifyBtn.disabled = true;
+    notifyStatusEl.textContent = 'Benachrichtigungen sind im Browser blockiert. Erlaube sie in den Website-Einstellungen.';
+  } else if (notifyEnabled()) {
+    notifyBtn.disabled = true;
+    notifyStatusEl.textContent =
+      'Erinnerungen sind aktiv: Peak und Fütterfrist. Der Browser kann sie bei geschlossener App verzögern oder verwerfen.';
+  } else {
+    notifyBtn.disabled = false;
+    notifyStatusEl.textContent = '';
+  }
+}
+
+// Only a started refreshment has notifications. A reset removes the stored start time.
+function syncNotifications(start: Date, timing: Parameters<typeof notifier.schedule>[1]): void {
+  if (notifyEnabled() && store.get() !== null) notifier.schedule(start, timing);
+  else notifier.cancel();
+}
+
+notifyBtn.addEventListener('click', () => {
+  if (!notifySupported) return;
+  Notification.requestPermission()
+    .then((permission) => {
+      if (permission === 'granted') store.set('on', NOTIFY_KEY);
+      updateNotifyUi();
+      render();
+    })
+    .catch(() => updateNotifyUi());
+});
+
 const OUTPUT_IDS = ['o-flour', 'o-water', 'o-starter', 'o-doubling', 'o-peak', 's-start', 's-peak', 's-end', 's-stable', 's-fridge-short', 's-fridge-week'];
 
 function showError(msg: string | null): void {
   errorEl.hidden = msg === null;
   errorEl.textContent = msg ?? '';
   if (msg === null) return;
+  notifier.cancel();
   updateSupplyWarning(null);
   // Clear stale results so the page never shows values for invalid input.
   for (const id of OUTPUT_IDS) $(id).textContent = '–';
@@ -223,6 +295,7 @@ function render(): void {
   updateSupplyWarning(amounts.starter);
   const timing = calcTiming(ratio, temp, getFlour(flourEl));
   const schedule = buildSchedule(start, timing);
+  syncNotifications(start, timing);
 
   $('o-flour').textContent = `${amounts.flour} g`;
   $('o-water').textContent = `${amounts.water} g`;
@@ -302,6 +375,7 @@ $('btn-start').addEventListener('click', () => {
 });
 $('btn-reset').addEventListener('click', () => {
   store.clear();
+  notifier.cancel();
   startEl.value = toLocalInput(new Date());
   render();
 });
@@ -490,6 +564,7 @@ tFormEl.addEventListener('input', (e) => {
 });
 tFormEl.addEventListener('submit', (e) => e.preventDefault());
 
+updateNotifyUi();
 render();
 renderFridge();
 

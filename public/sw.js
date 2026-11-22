@@ -83,3 +83,49 @@ self.addEventListener('fetch', (event) => {
   else if (url.pathname.includes('/assets/')) event.respondWith(cacheFirst(req));
   else event.respondWith(networkFirst(req, req));
 });
+
+// Timers of the scheduled notifications, by tag. A browser can stop an idle worker,
+// so a notification is reliable only while the browser keeps the worker alive.
+const timers = new Map();
+const MAX_DELAY_MS = 2 ** 31 - 1;
+const TAGS = ['peak', 'urgent'];
+
+function cancelAll() {
+  for (const id of timers.values()) clearTimeout(id);
+  timers.clear();
+}
+
+function schedule(items) {
+  cancelAll();
+  for (const item of items) {
+    if (!item || !TAGS.includes(item.tag) || typeof item.title !== 'string' || typeof item.body !== 'string') continue;
+    const delay = item.at - Date.now();
+    if (!Number.isFinite(delay) || delay <= 0 || delay > MAX_DELAY_MS) continue;
+    // A second item with the same tag replaces the first one.
+    clearTimeout(timers.get(item.tag));
+    timers.set(
+      item.tag,
+      setTimeout(() => {
+        timers.delete(item.tag);
+        self.registration
+          .showNotification(item.title, { body: item.body, tag: item.tag, icon: './icon-192.png' })
+          .catch(() => undefined);
+      }, delay),
+    );
+  }
+}
+
+self.addEventListener('message', (event) => {
+  const data = event.data;
+  if (!data) return;
+  if (data.type === 'cancel') cancelAll();
+  else if (data.type === 'schedule' && Array.isArray(data.items)) schedule(data.items);
+});
+
+// A tap on the notification opens the app.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window' }).then((list) => (list.length > 0 ? list[0].focus() : self.clients.openWindow('./'))),
+  );
+});
