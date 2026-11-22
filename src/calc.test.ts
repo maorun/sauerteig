@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  calcCombinedSchedule,
   calcFridgePlan,
   FRIDGE_DURATIONS,
   FRIDGE_OPTIONS,
@@ -517,5 +518,34 @@ describe('fridge storage plan', () => {
     expect(() => calcFridgePlan('month' as never, fed, 150)).toThrow(RangeError);
     expect(() => calcFridgePlan('short', new Date(NaN), 150)).toThrow(RangeError);
     expect(() => calcFridgePlan('short', fed, 0)).toThrow(RangeError);
+  });
+});
+
+describe('calcCombinedSchedule', () => {
+  const start = new Date('2026-11-22T08:00:00Z');
+  const schedule = buildSchedule(start, { peakHours: 6, doublingHours: 4.8, windowEndHours: 9 });
+  it('moves from the peak at ambient temperature to the fridge at the window end', () => {
+    const c = calcCombinedSchedule(schedule, 'short');
+    expect(c.peak.toISOString()).toBe('2026-11-22T14:00:00.000Z');
+    expect(c.transfer.toISOString()).toBe('2026-11-22T17:00:00.000Z');
+    expect(c.ambientStableHours).toBe(3);
+    expect(c.duration).toBe('short');
+    expect(calcCombinedSchedule(schedule, 'week').duration).toBe('week');
+  });
+  it('ends the chilled storage after the days of the fridge option, counted from the transfer', () => {
+    expect(calcCombinedSchedule(schedule, 'short').fridgeEnd.toISOString()).toBe('2026-11-25T17:00:00.000Z');
+    expect(calcCombinedSchedule(schedule, 'week').fridgeEnd.toISOString()).toBe('2026-11-29T17:00:00.000Z');
+  });
+  it('follows the ambient temperature through calcTiming', () => {
+    const ratio = { flour: 1, water: 1, starter: 1 };
+    const cold = calcCombinedSchedule(buildSchedule(start, calcTiming(ratio, 20)), 'short');
+    const warm = calcCombinedSchedule(buildSchedule(start, calcTiming(ratio, 28)), 'short');
+    expect(cold.transfer.getTime()).toBeGreaterThan(warm.transfer.getTime());
+    expect(cold.ambientStableHours).toBeGreaterThan(warm.ambientStableHours);
+  });
+  it('rejects invalid input', () => {
+    expect(() => calcCombinedSchedule(schedule, 'month' as never)).toThrow(RangeError);
+    expect(() => calcCombinedSchedule({ ...schedule, peak: new Date(NaN) }, 'short')).toThrow(RangeError);
+    expect(() => calcCombinedSchedule({ ...schedule, windowEnd: new Date('2026-11-22T13:00:00Z') }, 'short')).toThrow(RangeError);
   });
 });

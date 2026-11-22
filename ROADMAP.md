@@ -23,14 +23,6 @@ Rules for this file:
 
 ## Priority 4
 
-### Combined storage stability and room temperature timing (`storage-peak-combined-schedule`)
-
-- **Rank:** Feature model. Total 18/40 (baking 6, usability 5, harmony 4, safety 3). Effort M. Estimate.
-- **Code:** `src/calc.ts`, `src/calc.test.ts`, `src/main.ts`.
-- **Problem:** Bakers need to know how long a starter remains stable at room temperature after peak before it must move to cold storage or be fed.
-- **Goal:** Calculate a combined two-stage schedule showing ambient rise to peak followed by chilled storage shelf life.
-- **Acceptance test:** Unit tests and UI schedule verify transition timestamps from peak at ambient temperature to refrigerator preservation.
-
 ## Priority 5
 
 ## Rules for ranking

@@ -6,6 +6,7 @@ import {
   calcTiming,
   DEFAULT_FLOUR,
   FLOUR_LABELS,
+  calcCombinedSchedule,
   calcFridgePlan,
   isFridgeDuration,
   type FridgeDuration,
@@ -165,7 +166,7 @@ function saveInventory(): void {
 
 let tick: number | undefined;
 
-const OUTPUT_IDS = ['o-flour', 'o-water', 'o-starter', 'o-doubling', 'o-peak', 's-start', 's-peak', 's-end'];
+const OUTPUT_IDS = ['o-flour', 'o-water', 'o-starter', 'o-doubling', 'o-peak', 's-start', 's-peak', 's-end', 's-stable', 's-fridge-short', 's-fridge-week'];
 
 function showError(msg: string | null): void {
   errorEl.hidden = msg === null;
@@ -216,6 +217,11 @@ function render(): void {
   $('s-start').textContent = fmtTime.format(schedule.start);
   $('s-peak').textContent = fmtTime.format(schedule.peak);
   $('s-end').textContent = fmtTime.format(schedule.windowEnd);
+  // The window end is the latest transfer into the fridge, so the chilled stage starts there.
+  const toFridge = calcCombinedSchedule(schedule, 'short');
+  $('s-stable').textContent = fmtDuration(toFridge.ambientStableHours);
+  $('s-fridge-short').textContent = fmtDateTime.format(toFridge.fridgeEnd);
+  $('s-fridge-week').textContent = fmtDateTime.format(calcCombinedSchedule(schedule, 'week').fridgeEnd);
 
   const update = (): void => {
     const elapsed = (Date.now() - start.getTime()) / 3_600_000;
