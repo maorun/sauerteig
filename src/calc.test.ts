@@ -11,6 +11,11 @@ import {
   parseInventoryGrams,
   parseStarterInventory,
   serializeStarterInventory,
+  parseTrackerInputs,
+  serializeTrackerInputs,
+  MAX_TOTAL_G,
+  MIN_TEMP_C,
+  MAX_TEMP_C,
   MAX_INVENTORY_G,
   calcTargetOptions,
   MIN_STARTER_SHARE,
@@ -547,5 +552,49 @@ describe('calcCombinedSchedule', () => {
     expect(() => calcCombinedSchedule(schedule, 'month' as never)).toThrow(RangeError);
     expect(() => calcCombinedSchedule({ ...schedule, peak: new Date(NaN) }, 'short')).toThrow(RangeError);
     expect(() => calcCombinedSchedule({ ...schedule, windowEnd: new Date('2026-11-22T13:00:00Z') }, 'short')).toThrow(RangeError);
+  });
+});
+
+describe('parseTrackerInputs', () => {
+  const valid = { flour: 1, water: 1, starter: 5, tempC: 20, totalG: 150 };
+  const raw = (patch: Record<string, unknown> = {}): string => JSON.stringify({ ...valid, ...patch });
+  it('accepts valid stored values', () => {
+    expect(parseTrackerInputs(raw())).toEqual({ ratio: { flour: 1, water: 1, starter: 5 }, tempC: 20, totalG: 150 });
+  });
+  it('round-trips through serializeTrackerInputs', () => {
+    const inputs = { ratio: { flour: 1, water: 2.5, starter: 0.05 }, tempC: 22.5, totalG: 320 };
+    expect(parseTrackerInputs(serializeTrackerInputs(inputs))).toEqual(inputs);
+  });
+  it('accepts the limits', () => {
+    expect(parseTrackerInputs(raw({ tempC: MIN_TEMP_C }))?.tempC).toBe(MIN_TEMP_C);
+    expect(parseTrackerInputs(raw({ tempC: MAX_TEMP_C }))?.tempC).toBe(MAX_TEMP_C);
+    expect(parseTrackerInputs(raw({ starter: MAX_RATIO_PART }))?.ratio.starter).toBe(MAX_RATIO_PART);
+    expect(parseTrackerInputs(raw({ totalG: MAX_TOTAL_G }))?.totalG).toBe(MAX_TOTAL_G);
+  });
+  it('rejects missing, empty and corrupt data', () => {
+    expect(parseTrackerInputs(null)).toBeNull();
+    expect(parseTrackerInputs('')).toBeNull();
+    expect(parseTrackerInputs('not json')).toBeNull();
+    expect(parseTrackerInputs('null')).toBeNull();
+    expect(parseTrackerInputs('[]')).toBeNull();
+    expect(parseTrackerInputs('{}')).toBeNull();
+  });
+  it('rejects non-numeric values', () => {
+    for (const key of Object.keys(valid)) {
+      expect(parseTrackerInputs(raw({ [key]: '5' }))).toBeNull();
+      expect(parseTrackerInputs(raw({ [key]: '' }))).toBeNull();
+      expect(parseTrackerInputs(raw({ [key]: null }))).toBeNull();
+      expect(parseTrackerInputs(raw({ [key]: 'abc' }))).toBeNull();
+    }
+  });
+  it('rejects out-of-range values', () => {
+    expect(parseTrackerInputs(raw({ flour: 0 }))).toBeNull();
+    expect(parseTrackerInputs(raw({ water: -1 }))).toBeNull();
+    expect(parseTrackerInputs(raw({ starter: MAX_RATIO_PART + 1 }))).toBeNull();
+    expect(parseTrackerInputs(raw({ tempC: MIN_TEMP_C - 0.5 }))).toBeNull();
+    expect(parseTrackerInputs(raw({ tempC: MAX_TEMP_C + 0.5 }))).toBeNull();
+    expect(parseTrackerInputs(raw({ totalG: 0 }))).toBeNull();
+    expect(parseTrackerInputs(raw({ totalG: MAX_TOTAL_G + 1 }))).toBeNull();
+    expect(parseTrackerInputs('{"flour":1,"water":1,"starter":1e999,"tempC":20,"totalG":150}')).toBeNull();
   });
 });

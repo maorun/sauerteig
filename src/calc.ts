@@ -305,6 +305,38 @@ export function serializeStarterInventory(inventory: StarterInventory): string {
   return JSON.stringify({ grams: inventory.grams, flour: inventory.flour, refreshedAt: inventory.refreshedAt });
 }
 
+/** Upper bound for the total amount in grams, so the amounts stay finite. */
+export const MAX_TOTAL_G = 1_000_000;
+
+export interface TrackerInputs {
+  ratio: Ratio;
+  tempC: number;
+  totalG: number;
+}
+
+/** Parses stored tracker inputs. Returns null for missing, corrupt or out-of-range data, so the caller keeps its defaults. */
+export function parseTrackerInputs(raw: string | null): TrackerInputs | null {
+  if (raw === null) return null;
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return null;
+  const { flour, water, starter, tempC, totalG } = data as Record<string, unknown>;
+  const isPart = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= MAX_RATIO_PART;
+  if (!isPart(flour) || !isPart(water) || !isPart(starter)) return null;
+  if (typeof tempC !== 'number' || !Number.isFinite(tempC) || tempC < MIN_TEMP_C || tempC > MAX_TEMP_C) return null;
+  if (typeof totalG !== 'number' || !Number.isFinite(totalG) || totalG <= 0 || totalG > MAX_TOTAL_G) return null;
+  return { ratio: { flour, water, starter }, tempC, totalG };
+}
+
+export function serializeTrackerInputs(inputs: TrackerInputs): string {
+  const { ratio, tempC, totalG } = inputs;
+  return JSON.stringify({ flour: ratio.flour, water: ratio.water, starter: ratio.starter, tempC, totalG });
+}
+
 export interface SupplyCheck {
   sufficient: boolean;
   /** Missing starter in whole grams, 0 if the supply is sufficient. */

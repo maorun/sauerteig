@@ -19,14 +19,6 @@ Rules for this file:
 
 ## Priority 2
 
-### Keep the tracker inputs after a reload (`persist-tracker-inputs`)
-
-- **Rank:** Feature model. Total 27/40 (baking 6, usability 8, harmony 8, safety 5). Effort S. Estimate.
-- **Code:** `src/main.ts`, `src/calc.ts`, `src/calc.test.ts`.
-- **Problem:** The app stores only the start time, the flour type and the starter inventory. The ratio, the temperature and the amount go back to the defaults after each reload. The tracker then shows a wrong peak time for a running refreshment.
-- **Goal:** Store the ratio parts, the temperature and the amount in `localStorage`. Read them at start-up with a parser that rejects invalid or out-of-range values and uses the defaults instead.
-- **Acceptance test:** Unit tests for the parser accept valid stored values and reject empty, non-numeric and out-of-range values. A manual test changes the ratio to 1:1:5 and the temperature to 20 °C, reloads the page and sees the same values and the same peak time.
-
 ### Send a notification at the peak and before the feed deadline (`peak-deadline-notifications`)
 
 - **Rank:** Feature model. Total 26/40 (baking 8, usability 5, harmony 6, safety 7). Effort L. Estimate.
