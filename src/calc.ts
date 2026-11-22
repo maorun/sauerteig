@@ -366,3 +366,36 @@ export function calcFridgePlan(duration: FridgeDuration, fedAt: Date, total: num
     nextFeed: new Date(fedAt.getTime() + days * 24 * 3_600_000),
   };
 }
+
+export interface CombinedSchedule {
+  /** End of the ambient rise. The starter is at its maximum activity. */
+  peak: Date;
+  /** Latest time to feed the starter and move it into the fridge. */
+  transfer: Date;
+  /** Hours the starter stays stable at ambient temperature after the peak. */
+  ambientStableHours: number;
+  duration: FridgeDuration;
+  /** Latest refreshment after the chilled storage that starts at the transfer time. */
+  fridgeEnd: Date;
+}
+
+/**
+ * Joins the ambient rise and the chilled storage into two stages.
+ * Stage 1 runs from the start to the peak and on to the end of the window (transfer).
+ * Stage 2 starts at the transfer and lasts the number of days of the fridge option.
+ */
+export function calcCombinedSchedule(schedule: Schedule, duration: FridgeDuration): CombinedSchedule {
+  if (!isFridgeDuration(duration)) throw new RangeError(`unknown fridge duration: ${String(duration)}`);
+  const { peak, windowEnd } = schedule;
+  if (Number.isNaN(peak.getTime()) || Number.isNaN(windowEnd.getTime())) {
+    throw new RangeError('schedule must contain valid dates');
+  }
+  if (windowEnd.getTime() < peak.getTime()) throw new RangeError('windowEnd must not be before peak');
+  return {
+    peak,
+    transfer: windowEnd,
+    ambientStableHours: (windowEnd.getTime() - peak.getTime()) / 3_600_000,
+    duration,
+    fridgeEnd: new Date(windowEnd.getTime() + FRIDGE_OPTIONS[duration].days * 24 * 3_600_000),
+  };
+}
