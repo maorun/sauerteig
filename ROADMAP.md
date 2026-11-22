@@ -19,14 +19,6 @@ Rules for this file:
 
 ## Priority 2
 
-### Run tests and typecheck in CI for each pull request (`ci-test-typecheck-workflow`)
-
-- **Rank:** Maintenance model. Total 29/40 (reach 9, safety 8, speed 6, unblocks 6). Effort S. Estimate.
-- **Code:** `.github/workflows/ci.yml` (new), `package.json`.
-- **Problem:** The repository has no CI workflow. A pull request can merge with failed tests or type errors, because no check runs on GitHub.
-- **Goal:** Add a GitHub Actions workflow that runs `npm ci`, `npm run typecheck`, `npm test` and `npm run build` on each pull request and on each push to `main`. Pin the Node version in the workflow.
-- **Acceptance test:** A pull request shows one required check. The check fails when a test in `src/calc.test.ts` fails. The check passes on the current `main`.
-
 ### Keep the tracker inputs after a reload (`persist-tracker-inputs`)
 
 - **Rank:** Feature model. Total 27/40 (baking 6, usability 8, harmony 8, safety 5). Effort S. Estimate.
