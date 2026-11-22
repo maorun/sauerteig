@@ -1,18 +1,105 @@
 # Roadmap
 
-## Offene Punkte
+This file lists the open work for the Sourdough PWA.
+The list uses priorities. Priority 1 is the highest priority.
+Do the work in priority order, unless the maintainer gives a different order.
 
-- [ ] **Visuelle Trennung des Zielzeit-Rechners**: Den Zielzeit-Rechner und den Haupt-Tracker in eigenständige Bereiche oder Tabs trennen, um die Benutzerführung zu entflechten.
-- [ ] **Aufgeteilte Number-Inputs für Mischverhältnisse**: Das Freitextfeld durch drei separate `number`-Inputs für Mehl, Wasser und Anstellgut mit Validierung ersetzen.
-- [ ] **Bestandsverwaltung für Anstellgut**: Vorhandenes Anstellgut (Menge in Gramm, Mehlsorte und letzter Fütterungszeitpunkt) im `localStorage` speichern und mit Rezepten abgleichen.
-- [ ] **Fokus auf Auffrisch-Grenzen und Überreife**: Neben dem Peak das kritische Zeitfenster für die zwingende Neuauffrischung vor Übersäuerung und Abbau hervorheben.
-- [ ] **Lagerungs- und Fütterungszeiten für den Kühlschrank**: Konkrete Verhältnisse und Zeitpläne für 2–3 Tage sowie eine Woche Kühlschranklagerung auflisten.
-- [ ] **Kombinierte Übersicht für Lagerung und Reifephasen**: Visualisierung der Stabilität nach dem Peak bei Raumtemperatur und nach anschließendem Kühlen.
+Rules for this file:
 
-## Erledigte Punkte
+- Write in ASD-STE100 Simplified Technical English.
+- Add one entry for each open item. Do not give an entry a status. Each entry in this file is open.
+- Remove an entry in the pull request that completes it.
+- Each entry names the code location, the goal and the acceptance test.
+- Each entry has a `Rank` line with the model, the total score, the four single scores and the effort size. See "Rules for ranking".
+- Put each entry in the priority that matches its total score. Order the entries inside a priority by total score, highest first.
+- Priority 1 is the exception. It holds critical bugs and has no score band.
+- Do not add area labels or category headers.
 
-- [x] **PWA-Basis**: Progressive Web App mit Offline-Betrieb, Manifest und Service Worker eingerichtet.
-- [x] **Reifezeit-Berechnung**: Berechnung von Verdopplung, Peak und Nutzungsfenster auf Basis von Mehl, Wasser, ASG und Temperatur.
-- [x] **Zielzeit-Rechner**: Rückwärts-Berechnung mit Auswahltabelle machbarer Kombinationen aus Temperatur und Verhältnis.
-- [x] **Network-First Caching**: Zuverlässige Aktualisierung der Web-Assets ohne veralteten Browser-Cache.
-- [x] **Mehlsorten-Auswahl**: Integration spezifischer Reifezeitfaktoren für Roggenvollkornmehl (Faktor 0,75), Roggenmehl, Weizenvollkorn, Dinkel und Weizen Typ 550.
+## Priority 1: Critical faults
+
+## Priority 2
+
+### Visual separation of target-time calculator (`separate-target-calculator`)
+
+- **Rank:** Feature model. Total 28/40 (baking 7, usability 9, harmony 6, safety 6). Effort S. Estimate.
+- **Code:** `index.html`, `src/main.ts`, `src/style.css`.
+- **Problem:** The target-time calculator is currently placed in the middle of the main tracker, confusing the user flow.
+- **Goal:** Separate the target-time calculator and the main tracker into distinct sections or tabs with clear visual boundaries.
+- **Acceptance test:** Opening the PWA presents distinct tabs or separated views for the forward tracker and the reverse target-time calculator.
+
+### Split ratio inputs into separate number inputs (`split-ratio-number-inputs`)
+
+- **Rank:** Feature model. Total 27/40 (baking 7, usability 9, harmony 6, safety 5). Effort S. Estimate.
+- **Code:** `index.html`, `src/main.ts`, `src/calc.ts`.
+- **Problem:** The single text input for ratio (`1:1:0.28`) requires manual typing of colons, which is error-prone on mobile keyboards.
+- **Goal:** Replace the single text input with three separate numeric inputs for flour, water, and starter with dedicated stepper controls and validation.
+- **Acceptance test:** Entering values in the separate flour, water, and starter inputs automatically calculates and updates the amounts and fermentation timing.
+
+## Priority 3
+
+### Starter inventory persistence (`starter-inventory-storage`)
+
+- **Rank:** Feature model. Total 23/40 (baking 8, usability 6, harmony 5, safety 4). Effort M. Estimate.
+- **Code:** `index.html`, `src/main.ts`, `src/calc.ts`.
+- **Problem:** Bakers cannot persist the available amount and refreshment state of their starter culture between baking sessions.
+- **Goal:** Allow bakers to store available starter weight, flour type, and refreshment timestamp in `localStorage`, and alert when supply is low.
+- **Acceptance test:** A dedicated starter card persists starter amount and timestamp across page reloads and warns when available starter is insufficient.
+
+### Focus on refresh deadline and over-fermentation (`refresh-deadline-focus`)
+
+- **Rank:** Feature model. Total 22/40 (baking 8, usability 6, harmony 5, safety 3). Effort S. Estimate.
+- **Code:** `src/calc.ts`, `src/calc.test.ts`, `src/main.ts`, `index.html`.
+- **Problem:** The UI emphasizes the peak time, but does not sufficiently warn against the critical deadline where the starter degrades and starves.
+- **Goal:** Prominently display the mandatory refresh deadline and starvation threshold with a clear visual warning indicator and remaining time.
+- **Acceptance test:** The schedule and countdown prominently display the deadline for re-feeding before acid accumulation ruins the culture.
+
+## Priority 4
+
+### Fridge storage and feeding schedules (`fridge-storage-schedules`)
+
+- **Rank:** Feature model. Total 19/40 (baking 7, usability 5, harmony 4, safety 3). Effort M. Estimate.
+- **Code:** `src/calc.ts`, `src/calc.test.ts`, `src/main.ts`, `index.html`.
+- **Problem:** Bakers who store starter in the refrigerator (4..6 °C) lack guidance on appropriate feeding ratios for 2-3 days vs. 1 week intervals.
+- **Goal:** Add a calculator or reference table displaying specific feeding ratios and cold storage durations for 2-3 days and 7 days.
+- **Acceptance test:** Selecting a cold storage duration outputs the recommended feeding ratio and next re-feed date for 4..6 °C storage.
+
+### Combined storage stability and room temperature timing (`storage-peak-combined-schedule`)
+
+- **Rank:** Feature model. Total 18/40 (baking 6, usability 5, harmony 4, safety 3). Effort M. Estimate.
+- **Code:** `src/calc.ts`, `src/calc.test.ts`, `src/main.ts`.
+- **Problem:** Bakers need to know how long a starter remains stable at room temperature after peak before it must move to cold storage or be fed.
+- **Goal:** Calculate a combined two-stage schedule showing ambient rise to peak followed by chilled storage shelf life.
+- **Acceptance test:** Unit tests and UI schedule verify transition timestamps from peak at ambient temperature to refrigerator preservation.
+
+## Priority 5
+
+## Rules for ranking
+
+Rate each entry with one of two models. Each model has four criteria. Each criterion has a value from 0 to 10. The total score is the sum, with a maximum of 40.
+Both models use the same scale. Therefore, one priority table applies to both models.
+Effort does not add to the total. Give the effort as a size: S (one small pull request), M (one large pull request), L (several pull requests).
+
+**Feature model.** Use it for an entry that changes the web app behavior or UI:
+
+1. **Baking:** How much does the feature help the practical sourdough workflow?
+2. **Usability:** How clear and intuitive is the interaction and UI design?
+3. **Harmony:** How well does the feature extend existing calculations and data?
+4. **Safety:** How well does it prevent dough failure or over-fermentation? (10 means no risk).
+
+**Maintenance model.** Use it for an entry that changes code structure, tests or tooling:
+
+1. **Reach:** How many modules or features gain from the change?
+2. **Safety:** How many bugs or regressions does the change prevent or find?
+3. **Speed:** How much does the change speed up development?
+4. **Unblocks:** How many other entries need this entry or become cheaper after it?
+
+The mark `Estimate` means that the maintainer did not rate the entry. Replace the estimate when the maintainer rates the entry.
+
+Put a new entry in the priority that matches its total score:
+
+| Total score | Priority |
+|---|---|
+| 26 or more | 2 |
+| 21 to 25 | 3 |
+| 16 to 20 | 4 |
+| below 16 | 5 |
