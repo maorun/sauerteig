@@ -6,6 +6,9 @@ import {
   calcTiming,
   DEFAULT_FLOUR,
   FLOUR_LABELS,
+  calcFridgePlan,
+  isFridgeDuration,
+  type FridgeDuration,
   isFlourType,
   checkStarterSupply,
   MAX_INVENTORY_G,
@@ -46,6 +49,15 @@ const PHASE_LABEL: Record<PhaseName, string> = {
 
 const fmtTime = new Intl.DateTimeFormat('de-DE', {
   weekday: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+// A refeed date can lie days ahead, so the date belongs in the output.
+const fmtDateTime = new Intl.DateTimeFormat('de-DE', {
+  weekday: 'short',
+  day: '2-digit',
+  month: '2-digit',
   hour: '2-digit',
   minute: '2-digit',
 });
@@ -390,8 +402,47 @@ tBodyEl.addEventListener('click', (e) => {
   heading.focus({ preventScroll: true });
 });
 
+// --- Fridge storage ---
+const fDurationEl = $<HTMLSelectElement>('f-duration');
+const fFedEl = $<HTMLInputElement>('f-fed');
+const fTotalEl = $<HTMLInputElement>('f-total');
+const fErrorEl = $('f-error');
+const F_OUTPUT_IDS = ['f-ratio', 'f-flour', 'f-water', 'f-starter', 'f-next'];
+
+function renderFridge(): void {
+  const fail = (msg: string): void => {
+    fErrorEl.hidden = false;
+    fErrorEl.textContent = msg;
+    for (const id of F_OUTPUT_IDS) $(id).textContent = '–';
+  };
+  // Select values come from the DOM, so a tampered option falls back to the short duration.
+  const duration: FridgeDuration = isFridgeDuration(fDurationEl.value) ? fDurationEl.value : 'short';
+  const fed = fFedEl.value === '' ? new Date() : new Date(fFedEl.value);
+  const total = Number(fTotalEl.value);
+  if (Number.isNaN(fed.getTime())) return fail('Zeit des Fütterns ungültig.');
+  if (!Number.isFinite(total) || total <= 0 || total > MAX_TOTAL_G) {
+    return fail(`Menge muss zwischen 1 und ${MAX_TOTAL_G} g liegen.`);
+  }
+  const plan = calcFridgePlan(duration, fed, total);
+  if (plan.amounts.flour < 1 || plan.amounts.water < 1 || plan.amounts.starter < 1) {
+    return fail('Menge zu klein für dieses Verhältnis. Menge erhöhen.');
+  }
+  fErrorEl.hidden = true;
+  fErrorEl.textContent = '';
+  $('f-ratio').textContent = `${plan.ratio.flour} : ${plan.ratio.water} : ${plan.ratio.starter}`;
+  $('f-flour').textContent = `${plan.amounts.flour} g`;
+  $('f-water').textContent = `${plan.amounts.water} g`;
+  $('f-starter').textContent = `${plan.amounts.starter} g`;
+  $('f-next').textContent = fmtDateTime.format(plan.nextFeed);
+}
+
+$('fridge-form').addEventListener('input', renderFridge);
+$('fridge-form').addEventListener('submit', (e) => e.preventDefault());
+
 // --- Tabs ---
 function selectTab(name: TabName, focus = false): void {
+  // The empty fed time means "now", so the plan must refresh each time the tab opens.
+  if (name === 'fridge') renderFridge();
   for (const n of TAB_NAMES) {
     const tab = $(`tab-${n}`);
     const active = n === name;
@@ -419,6 +470,7 @@ tFormEl.addEventListener('input', (e) => {
 tFormEl.addEventListener('submit', (e) => e.preventDefault());
 
 render();
+renderFridge();
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   // Reload when a new worker takes over, so the page runs the new release.

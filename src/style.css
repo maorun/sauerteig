@@ -74,7 +74,7 @@ button {
 }
 button.secondary { background: transparent; color: var(--text); }
 [hidden] { display: none !important; }
-.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem; padding: 0.25rem; background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; }
+.tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.25rem; padding: 0.25rem; background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; }
 button.tab { background: transparent; color: var(--text); border-color: transparent; }
 button.tab[aria-selected="true"] { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .panel { display: grid; gap: 1rem; }

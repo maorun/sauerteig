@@ -13,10 +13,11 @@ const panel = (name: string): string => {
 describe('tab navigation', () => {
   it('moves with arrow keys and wraps around', () => {
     expect(nextTab('tracker', 'ArrowRight')).toBe('target');
-    expect(nextTab('target', 'ArrowRight')).toBe('tracker');
-    expect(nextTab('tracker', 'ArrowLeft')).toBe('target');
-    expect(nextTab('target', 'Home')).toBe('tracker');
-    expect(nextTab('tracker', 'End')).toBe('target');
+    expect(nextTab('target', 'ArrowRight')).toBe('fridge');
+    expect(nextTab('fridge', 'ArrowRight')).toBe('tracker');
+    expect(nextTab('tracker', 'ArrowLeft')).toBe('fridge');
+    expect(nextTab('fridge', 'Home')).toBe('tracker');
+    expect(nextTab('tracker', 'End')).toBe('fridge');
   });
   it('ignores other keys', () => {
     expect(nextTab('tracker', 'a')).toBeNull();
@@ -40,6 +41,17 @@ describe('index.html structure', () => {
     for (const id of ['inv-grams', 'inv-flour', 'inv-time', 'inv-warning', 'btn-inv-refreshed']) {
       expect(tracker).toContain(`id="${id}"`);
     }
+  });
+  it('has a fridge panel with duration select, re-feed output and no tracker form', () => {
+    const fridge = panel('fridge');
+    expect(html).toMatch(/id="panel-fridge"[^>]*\bhidden\b/);
+    for (const id of ['f-duration', 'f-fed', 'f-total', 'f-ratio', 'f-flour', 'f-water', 'f-starter', 'f-next']) {
+      expect(fridge).toContain(`id="${id}"`);
+    }
+    expect(fridge).toContain('value="short"');
+    expect(fridge).toContain('value="week"');
+    expect(fridge).not.toContain('id="form"');
+    expect(panel('tracker')).not.toContain('f-duration');
   });
   it('keeps the target calculator out of the tracker panel', () => {
     const tracker = panel('tracker');

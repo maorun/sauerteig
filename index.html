@@ -17,6 +17,7 @@
       <div class="tabs" role="tablist" aria-label="Ansicht">
         <button id="tab-tracker" class="tab" type="button" role="tab" aria-selected="true" aria-controls="panel-tracker">Tracker</button>
         <button id="tab-target" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-target" tabindex="-1">Zielzeit-Rechner</button>
+        <button id="tab-fridge" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-fridge" tabindex="-1">Kühlschrank</button>
       </div>
 
       <div id="panel-tracker" class="panel" role="tabpanel" aria-labelledby="tab-tracker">
@@ -165,6 +166,37 @@
             <tbody id="t-body"></tbody>
           </table>
         </div>
+      </section>
+      </div>
+
+      <div id="panel-fridge" class="panel" role="tabpanel" aria-labelledby="tab-fridge" hidden>
+      <section class="card" aria-labelledby="h-fridge">
+        <h2 id="h-fridge">Kühlschranklagerung</h2>
+        <p class="muted">Gilt für 4–6 °C. Vor dem Kühlen füttern, dann sofort in den Kühlschrank stellen.</p>
+        <form id="fridge-form" class="target-form" novalidate>
+          <label>Lagerdauer
+            <select id="f-duration">
+              <option value="short" selected>2–3 Tage</option>
+              <option value="week">1 Woche</option>
+            </select>
+          </label>
+          <label>Gefüttert am (leer = jetzt)
+            <input id="f-fed" type="datetime-local" />
+          </label>
+          <label>Gewünschte Menge (g)
+            <input id="f-total" type="number" inputmode="decimal" value="150" min="1" max="1000000" step="1" />
+          </label>
+          <p id="f-error" role="alert" class="error" hidden></p>
+        </form>
+        <dl class="grid">
+          <div><dt>Verhältnis</dt><dd id="f-ratio">–</dd></div>
+          <div><dt>Mehl</dt><dd id="f-flour">–</dd></div>
+          <div><dt>Wasser</dt><dd id="f-water">–</dd></div>
+          <div><dt>ASG</dt><dd id="f-starter">–</dd></div>
+        </dl>
+        <ul class="schedule">
+          <li class="deadline-row"><span>Nächstes Füttern spätestens</span><time id="f-next"></time></li>
+        </ul>
       </section>
       </div>
     </main>

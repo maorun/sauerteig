@@ -316,3 +316,53 @@ export function checkStarterSupply(available: number, needed: number): SupplyChe
   const shortfall = Math.max(0, Math.ceil(needed - available));
   return { sufficient: shortfall === 0, shortfall };
 }
+
+/** Cold storage durations with a recommended feeding ratio. */
+export type FridgeDuration = 'short' | 'week';
+
+export interface FridgeOption {
+  /** Days until the starter needs the next refreshment. */
+  days: number;
+  /** Ratio flour : water : starter. More fresh flour and water give the culture food for a longer pause. */
+  ratio: Ratio;
+}
+
+/** Storage temperature range (°C) for which the ratios apply. */
+export const FRIDGE_MIN_TEMP_C = 4;
+export const FRIDGE_MAX_TEMP_C = 6;
+
+export const FRIDGE_OPTIONS: Readonly<Record<FridgeDuration, FridgeOption>> = {
+  short: { days: 3, ratio: { flour: 2, water: 2, starter: 1 } },
+  week: { days: 7, ratio: { flour: 5, water: 5, starter: 1 } },
+};
+
+export const FRIDGE_DURATIONS: readonly FridgeDuration[] = Object.keys(FRIDGE_OPTIONS) as FridgeDuration[];
+
+export function isFridgeDuration(value: unknown): value is FridgeDuration {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(FRIDGE_OPTIONS, value);
+}
+
+export interface FridgePlan {
+  duration: FridgeDuration;
+  ratio: Ratio;
+  /** Amounts for the requested total, rounded to whole grams. */
+  amounts: Amounts;
+  /** Latest time for the next refreshment. */
+  nextFeed: Date;
+}
+
+/**
+ * Plans the feeding before cold storage at 4..6 °C and the latest date of the next refreshment.
+ * The storage lasts a fixed number of 24 h blocks, so a daylight saving change shifts the local clock time.
+ */
+export function calcFridgePlan(duration: FridgeDuration, fedAt: Date, total: number): FridgePlan {
+  if (!isFridgeDuration(duration)) throw new RangeError(`unknown fridge duration: ${String(duration)}`);
+  if (Number.isNaN(fedAt.getTime())) throw new RangeError('fedAt must be a valid date');
+  const { days, ratio } = FRIDGE_OPTIONS[duration];
+  return {
+    duration,
+    ratio: { ...ratio },
+    amounts: calcAmounts(ratio, total),
+    nextFeed: new Date(fedAt.getTime() + days * 24 * 3_600_000),
+  };
+}

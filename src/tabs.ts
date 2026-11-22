@@ -1,4 +1,4 @@
-export const TAB_NAMES = ['tracker', 'target'] as const;
+export const TAB_NAMES = ['tracker', 'target', 'fridge'] as const;
 export type TabName = (typeof TAB_NAMES)[number];
 
 // Arrow keys wrap around. Home and End jump to the first and last tab.
