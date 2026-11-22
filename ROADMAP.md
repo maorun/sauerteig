@@ -21,14 +21,6 @@ Rules for this file:
 
 ## Priority 3
 
-### Move the input validation out of `main.ts` and test it (`extract-form-validation`)
-
-- **Rank:** Maintenance model. Total 24/40 (reach 7, safety 7, speed 5, unblocks 5). Effort M. Estimate.
-- **Code:** `src/main.ts`, `src/validate.ts` (new), `src/validate.test.ts` (new).
-- **Problem:** `src/main.ts` has about 500 lines. The checks for ratio, temperature, amount, start time and inventory and the German error texts are inside the render functions. No test covers them, so a change can break a check without a failed test.
-- **Goal:** Move each check into a pure function in `src/validate.ts`. Each function returns either the valid value or the error text. The render functions of the tracker, the target calculator and the fridge tab use these functions.
-- **Acceptance test:** Unit tests in `src/validate.test.ts` cover the limits of each field, for example 4 °C and 38 °C, an empty value and a value above the maximum. The current error texts stay the same. All tests in `src/tabs.test.ts` and `src/calc.test.ts` pass without change.
-
 ## Priority 4
 
 ### Record a feeding log with the last refreshments (`feeding-log`)

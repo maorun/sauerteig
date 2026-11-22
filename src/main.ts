@@ -12,8 +12,6 @@ import {
   type FridgeDuration,
   isFlourType,
   checkStarterSupply,
-  MAX_INVENTORY_G,
-  MAX_TOTAL_G,
   parseTrackerInputs,
   serializeTrackerInputs,
   parseInventoryGrams,
@@ -21,10 +19,6 @@ import {
   serializeStarterInventory,
   getDeadlineStatus,
   getPhase,
-  MAX_RATIO_PART,
-  MAX_TEMP_C,
-  MIN_TEMP_C,
-  parseRatioParts,
   splitHours,
   type FlourType,
   type PhaseName,
@@ -32,6 +26,18 @@ import {
 } from './calc';
 import { createNotifier, type WorkerMessage } from './notify';
 import { nextTab, TAB_NAMES, type TabName } from './tabs';
+import {
+  validateAmounts,
+  validateFedTime,
+  validateInventory,
+  validateInventoryForRefresh,
+  validateRatio,
+  validateStart,
+  validateTargetOrder,
+  validateTargetTimes,
+  validateTemp,
+  validateTotal,
+} from './validate';
 
 const STORE_KEY = 'sauerteig:start';
 const FLOUR_KEY = 'sauerteig:flour';
@@ -162,14 +168,15 @@ function saveInventory(): void {
     store.clear(INVENTORY_KEY);
     return;
   }
-  const grams = parseInventoryGrams(invGramsEl.value);
-  if (grams === null) {
+  const inventory = validateInventory(invGramsEl.value);
+  if (!inventory.ok) {
     invErrorEl.hidden = false;
-    invErrorEl.textContent = `Vorrat muss zwischen 0 und ${MAX_INVENTORY_G} g liegen.`;
+    invErrorEl.textContent = inventory.error;
     // Drop the stored stock, so a reload does not restore a value the field no longer shows.
     store.clear(INVENTORY_KEY);
     return;
   }
+  const grams = inventory.value;
   invErrorEl.hidden = true;
   invErrorEl.textContent = '';
   // The timestamp stays empty until the baker sets it, so no refreshment time is invented.
@@ -271,27 +278,25 @@ function showError(msg: string | null): void {
 
 function render(): void {
   window.clearInterval(tick);
-  const ratio = parseRatioParts(ratioFlourEl.value, ratioWaterEl.value, ratioStarterEl.value);
-  const temp = Number(tempEl.value);
-  const total = Number(totalEl.value);
-  const start = new Date(startEl.value);
-
-  if (!ratio) return showError(`Mehl, Wasser und ASG müssen Zahlen zwischen 0 und ${MAX_RATIO_PART} sein.`);
-  if (!Number.isFinite(temp) || tempEl.value === '' || temp < MIN_TEMP_C || temp > MAX_TEMP_C) {
-    return showError(`Temperatur muss zwischen ${MIN_TEMP_C} und ${MAX_TEMP_C} °C liegen.`);
-  }
-  if (!Number.isFinite(total) || total <= 0 || total > MAX_TOTAL_G) {
-    return showError(`Menge muss zwischen 1 und ${MAX_TOTAL_G} g liegen.`);
-  }
+  const ratioResult = validateRatio(ratioFlourEl.value, ratioWaterEl.value, ratioStarterEl.value);
+  if (!ratioResult.ok) return showError(ratioResult.error);
+  const tempResult = validateTemp(tempEl.value);
+  if (!tempResult.ok) return showError(tempResult.error);
+  const totalResult = validateTotal(totalEl.value);
+  if (!totalResult.ok) return showError(totalResult.error);
+  const ratio = ratioResult.value;
+  const temp = tempResult.value;
+  const total = totalResult.value;
   // Only a valid set gets stored, so a half-typed value never replaces the last good one.
   store.set(serializeTrackerInputs({ ratio, tempC: temp, totalG: total }), TRACKER_KEY);
-  if (Number.isNaN(start.getTime())) return showError('Startzeit ungültig.');
+  const startResult = validateStart(startEl.value);
+  if (!startResult.ok) return showError(startResult.error);
+  const start = startResult.value;
   showError(null);
 
   const amounts = calcAmounts(ratio, total);
-  if (amounts.flour < 1 || amounts.water < 1 || amounts.starter < 1) {
-    return showError('Menge zu klein für dieses Verhältnis. Menge erhöhen.');
-  }
+  const amountsResult = validateAmounts(amounts);
+  if (!amountsResult.ok) return showError(amountsResult.error);
   updateSupplyWarning(amounts.starter);
   const timing = calcTiming(ratio, temp, getFlour(flourEl));
   const schedule = buildSchedule(start, timing);
@@ -387,9 +392,10 @@ $('inv-form').addEventListener('input', () => {
 $('inv-form').addEventListener('submit', (e) => e.preventDefault());
 $('btn-inv-refreshed').addEventListener('click', () => {
   // Without a valid amount nothing gets stored, so the button must not show a time that a reload loses.
-  if (parseInventoryGrams(invGramsEl.value) === null) {
+  const stock = validateInventoryForRefresh(invGramsEl.value);
+  if (!stock.ok) {
     invErrorEl.hidden = false;
-    invErrorEl.textContent = `Zuerst Vorrat zwischen 0 und ${MAX_INVENTORY_G} g eingeben.`;
+    invErrorEl.textContent = stock.error;
     return;
   }
   invTimeEl.value = toLocalInput(new Date());
@@ -427,16 +433,14 @@ function renderTarget(): void {
   tWrapEl.hidden = true;
   setTargetStatus('');
   if (tTargetEl.value === '') return showTargetError(null);
-  const target = new Date(tTargetEl.value);
-  const start = tStartEl.value === '' ? new Date() : new Date(tStartEl.value);
-  // The tracker input has minute resolution, so both views use the same whole minute.
-  start.setSeconds(0, 0);
-  const total = Number(tTotalEl.value);
-  if (Number.isNaN(target.getTime()) || Number.isNaN(start.getTime())) return showTargetError('Zielzeit oder Startzeit ungültig.');
-  if (!Number.isFinite(total) || total <= 0 || total > MAX_TOTAL_G) {
-    return showTargetError(`Menge muss zwischen 1 und ${MAX_TOTAL_G} g liegen.`);
-  }
-  if (target.getTime() <= start.getTime()) return showTargetError('Zielzeit muss nach der Startzeit liegen.');
+  const times = validateTargetTimes(tTargetEl.value, tStartEl.value, new Date());
+  if (!times.ok) return showTargetError(times.error);
+  const { target, start } = times.value;
+  const totalResult = validateTotal(tTotalEl.value);
+  if (!totalResult.ok) return showTargetError(totalResult.error);
+  const total = totalResult.value;
+  const order = validateTargetOrder(target, start);
+  if (!order.ok) return showTargetError(order.error);
   showTargetError(null);
   tStartUsed = start;
 
@@ -512,16 +516,15 @@ function renderFridge(): void {
   };
   // Select values come from the DOM, so a tampered option falls back to the short duration.
   const duration: FridgeDuration = isFridgeDuration(fDurationEl.value) ? fDurationEl.value : 'short';
-  const fed = fFedEl.value === '' ? new Date() : new Date(fFedEl.value);
-  const total = Number(fTotalEl.value);
-  if (Number.isNaN(fed.getTime())) return fail('Zeit des Fütterns ungültig.');
-  if (!Number.isFinite(total) || total <= 0 || total > MAX_TOTAL_G) {
-    return fail(`Menge muss zwischen 1 und ${MAX_TOTAL_G} g liegen.`);
-  }
+  const fedResult = validateFedTime(fFedEl.value, new Date());
+  if (!fedResult.ok) return fail(fedResult.error);
+  const totalResult = validateTotal(fTotalEl.value);
+  if (!totalResult.ok) return fail(totalResult.error);
+  const fed = fedResult.value;
+  const total = totalResult.value;
   const plan = calcFridgePlan(duration, fed, total);
-  if (plan.amounts.flour < 1 || plan.amounts.water < 1 || plan.amounts.starter < 1) {
-    return fail('Menge zu klein für dieses Verhältnis. Menge erhöhen.');
-  }
+  const planAmounts = validateAmounts(plan.amounts);
+  if (!planAmounts.ok) return fail(planAmounts.error);
   fErrorEl.hidden = true;
   fErrorEl.textContent = '';
   $('f-ratio').textContent = `${plan.ratio.flour} : ${plan.ratio.water} : ${plan.ratio.starter}`;
