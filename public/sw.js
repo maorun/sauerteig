@@ -1,5 +1,5 @@
 // Precached app shell for offline use.
-// Bump CACHE on each release that must invalidate old entries.
+// Fallback name for dev. vite build replaces it with a hash of the built files (vite-plugin-sw-cache.ts).
 const CACHE = 'sauerteig-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 const INDEX = './index.html';

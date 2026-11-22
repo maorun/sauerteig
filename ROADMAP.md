@@ -47,14 +47,6 @@ Rules for this file:
 - **Goal:** Store a log entry with time, ratio, temperature and flour type for each "Jetzt füttern" click. Keep the last 20 entries. Show the log in a list with the time since the previous entry.
 - **Acceptance test:** Unit tests add entries, drop the oldest entry after 20 entries and reject corrupt stored data. A manual test feeds two times and sees two entries in the correct order after a reload.
 
-### Set the service worker cache name from the build (`sw-cache-version-from-build`)
-
-- **Rank:** Maintenance model. Total 16/40 (reach 4, safety 6, speed 4, unblocks 2). Effort S. Estimate.
-- **Code:** `public/sw.js`, `vite.config.ts`, `src/sw.test.ts`.
-- **Problem:** The cache name `sauerteig-v2` is a constant in `public/sw.js`. The maintainer must change it by hand for each release that must delete old caches. If the maintainer forgets it, users keep old cache entries.
-- **Goal:** Write the cache name during `vite build`, for example from the package version or a hash of the built files. Keep the network-first behavior for the app shell.
-- **Acceptance test:** A test builds the app two times with different content and gets two different cache names. The existing tests in `src/sw.test.ts` pass.
-
 ## Priority 5
 
 ## Rules for ranking
