@@ -21,9 +21,18 @@
 
       <div id="panel-tracker" class="panel" role="tabpanel" aria-labelledby="tab-tracker">
       <form id="form" class="card" novalidate>
-        <label>Verhältnis Mehl : Wasser : ASG
-          <input id="ratio" inputmode="text" value="1:1:1" autocomplete="off" />
-        </label>
+        <div class="ratio" role="group" aria-labelledby="ratio-legend">
+          <span id="ratio-legend" class="ratio-legend">Verhältnis Mehl : Wasser : ASG</span>
+          <label>Mehl
+            <input id="ratio-flour" type="number" inputmode="decimal" value="1" min="0.05" max="1000" step="any" />
+          </label>
+          <label>Wasser
+            <input id="ratio-water" type="number" inputmode="decimal" value="1" min="0.05" max="1000" step="any" />
+          </label>
+          <label>ASG
+            <input id="ratio-starter" type="number" inputmode="decimal" value="1" min="0.05" max="1000" step="any" />
+          </label>
+        </div>
         <label>Mehlsorte
           <select id="flour" aria-describedby="flour-hint">
             <option value="rye-whole">Roggenvollkornmehl (am schnellsten)</option>

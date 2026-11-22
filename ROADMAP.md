@@ -19,14 +19,6 @@ Rules for this file:
 
 ## Priority 2
 
-### Split ratio inputs into separate number inputs (`split-ratio-number-inputs`)
-
-- **Rank:** Feature model. Total 27/40 (baking 7, usability 9, harmony 6, safety 5). Effort S. Estimate.
-- **Code:** `index.html`, `src/main.ts`, `src/calc.ts`.
-- **Problem:** The single text input for ratio (`1:1:0.28`) requires manual typing of colons, which is error-prone on mobile keyboards.
-- **Goal:** Replace the single text input with three separate numeric inputs for flour, water, and starter with dedicated stepper controls and validation.
-- **Acceptance test:** Entering values in the separate flour, water, and starter inputs automatically calculates and updates the amounts and fermentation timing.
-
 ## Priority 3
 
 ### Starter inventory persistence (`starter-inventory-storage`)

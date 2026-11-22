@@ -106,9 +106,13 @@ export function calcAmounts(ratio: Ratio, total: number): Amounts {
   return { flour, water, starter: whole - flour - water };
 }
 
-export function parseRatio(text: string): Ratio | null {
-  const parts = text.split(':').map((p) => Number(p.trim().replace(',', '.')));
-  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n) || n <= 0)) {
+/** Upper bound for one ratio part, so the sum of the parts stays finite. */
+export const MAX_RATIO_PART = 1000;
+
+/** Builds a ratio from the three input strings. Returns null unless each part is a number from above 0 to MAX_RATIO_PART. */
+export function parseRatioParts(flour: string, water: string, starter: string): Ratio | null {
+  const parts = [flour, water, starter].map((p) => (p.trim() === '' ? NaN : Number(p.trim().replace(',', '.'))));
+  if (parts.some((n) => !Number.isFinite(n) || n <= 0 || n > MAX_RATIO_PART)) {
     return null;
   }
   return { flour: parts[0], water: parts[1], starter: parts[2] };

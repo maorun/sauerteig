@@ -19,7 +19,8 @@ import {
   calcTiming,
   doublingTimeHours,
   getPhase,
-  parseRatio,
+  MAX_RATIO_PART,
+  parseRatioParts,
   splitHours,
 } from './calc';
 
@@ -62,16 +63,26 @@ describe('calcAmounts', () => {
   });
 });
 
-describe('parseRatio', () => {
-  it('parses colon separated values', () => {
-    expect(parseRatio('1:2:1')).toEqual({ flour: 1, water: 2, starter: 1 });
-    expect(parseRatio(' 5 : 5 : 1 ')).toEqual({ flour: 5, water: 5, starter: 1 });
-    expect(parseRatio('1:1,5:1')).toEqual({ flour: 1, water: 1.5, starter: 1 });
+describe('parseRatioParts', () => {
+  it('parses three separate number strings', () => {
+    expect(parseRatioParts('1', '2', '1')).toEqual({ flour: 1, water: 2, starter: 1 });
+    expect(parseRatioParts(' 5 ', '5', '1')).toEqual({ flour: 5, water: 5, starter: 1 });
+    expect(parseRatioParts('1', '1,5', '0.28')).toEqual({ flour: 1, water: 1.5, starter: 0.28 });
   });
-  it('returns null for invalid ratios', () => {
-    expect(parseRatio('1:1')).toBeNull();
-    expect(parseRatio('a:b:c')).toBeNull();
-    expect(parseRatio('1:0:1')).toBeNull();
+  it('returns null for an empty, non-numeric or non-positive part', () => {
+    expect(parseRatioParts('1', '', '1')).toBeNull();
+    expect(parseRatioParts('1', '   ', '1')).toBeNull();
+    expect(parseRatioParts('a', 'b', 'c')).toBeNull();
+    expect(parseRatioParts('1', '0', '1')).toBeNull();
+    expect(parseRatioParts('1', '1', '-1')).toBeNull();
+    expect(parseRatioParts('1', '1', String(MAX_RATIO_PART + 1))).toBeNull();
+    expect(parseRatioParts('1', '1', '1e308')).toBeNull();
+    expect(parseRatioParts('1', '1', String(MAX_RATIO_PART))).not.toBeNull();
+  });
+  it('gives a ratio that yields the expected amounts and a slower peak for less starter', () => {
+    const ratio = parseRatioParts('1', '1', '0.28')!;
+    expect(calcAmounts(ratio, 228)).toEqual({ flour: 100, water: 100, starter: 28 });
+    expect(calcTiming(ratio, 24).peakHours).toBeGreaterThan(calcTiming({ flour: 1, water: 1, starter: 1 }, 24).peakHours);
   });
 });
 

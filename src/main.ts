@@ -8,9 +8,10 @@ import {
   FLOUR_LABELS,
   isFlourType,
   getPhase,
+  MAX_RATIO_PART,
   MAX_TEMP_C,
   MIN_TEMP_C,
-  parseRatio,
+  parseRatioParts,
   splitHours,
   type FlourType,
   type PhaseName,
@@ -55,7 +56,9 @@ const toLocalInput = (d: Date): string => {
 const flourEl = $<HTMLSelectElement>('flour');
 // Select values come from the DOM, so a tampered option falls back to the default.
 const getFlour = (el: HTMLSelectElement): FlourType => (isFlourType(el.value) ? el.value : DEFAULT_FLOUR);
-const ratioEl = $<HTMLInputElement>('ratio');
+const ratioFlourEl = $<HTMLInputElement>('ratio-flour');
+const ratioWaterEl = $<HTMLInputElement>('ratio-water');
+const ratioStarterEl = $<HTMLInputElement>('ratio-starter');
 const tempEl = $<HTMLInputElement>('temp');
 const totalEl = $<HTMLInputElement>('total');
 const startEl = $<HTMLInputElement>('start');
@@ -112,12 +115,12 @@ function showError(msg: string | null): void {
 
 function render(): void {
   window.clearInterval(tick);
-  const ratio = parseRatio(ratioEl.value);
+  const ratio = parseRatioParts(ratioFlourEl.value, ratioWaterEl.value, ratioStarterEl.value);
   const temp = Number(tempEl.value);
   const total = Number(totalEl.value);
   const start = new Date(startEl.value);
 
-  if (!ratio) return showError('Verhältnis im Format 1:1:1 eingeben (nur positive Zahlen).');
+  if (!ratio) return showError(`Mehl, Wasser und ASG müssen Zahlen zwischen 0 und ${MAX_RATIO_PART} sein.`);
   if (!Number.isFinite(temp) || tempEl.value === '' || temp < MIN_TEMP_C || temp > MAX_TEMP_C) {
     return showError(`Temperatur muss zwischen ${MIN_TEMP_C} und ${MAX_TEMP_C} °C liegen.`);
   }
@@ -282,7 +285,9 @@ tBodyEl.addEventListener('click', (e) => {
   const o = btn ? tOptions[Number(btn.dataset.index)] : undefined;
   if (!btn || !o) return;
   setFlour(o.flour, false);
-  ratioEl.value = `1:1:${Number(o.starterShare.toPrecision(6))}`;
+  ratioFlourEl.value = '1';
+  ratioWaterEl.value = '1';
+  ratioStarterEl.value = String(Number(o.starterShare.toPrecision(6)));
   tempEl.value = String(o.tempC);
   totalEl.value = tTotalEl.value;
   // The tracker starts at the chosen start time, so its peak matches the target time.
