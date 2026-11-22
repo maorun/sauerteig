@@ -23,14 +23,6 @@ Rules for this file:
 
 ## Priority 4
 
-### Fridge storage and feeding schedules (`fridge-storage-schedules`)
-
-- **Rank:** Feature model. Total 19/40 (baking 7, usability 5, harmony 4, safety 3). Effort M. Estimate.
-- **Code:** `src/calc.ts`, `src/calc.test.ts`, `src/main.ts`, `index.html`.
-- **Problem:** Bakers who store starter in the refrigerator (4..6 °C) lack guidance on appropriate feeding ratios for 2-3 days vs. 1 week intervals.
-- **Goal:** Add a calculator or reference table displaying specific feeding ratios and cold storage durations for 2-3 days and 7 days.
-- **Acceptance test:** Selecting a cold storage duration outputs the recommended feeding ratio and next re-feed date for 4..6 °C storage.
-
 ### Combined storage stability and room temperature timing (`storage-peak-combined-schedule`)
 
 - **Rank:** Feature model. Total 18/40 (baking 6, usability 5, harmony 4, safety 3). Effort M. Estimate.

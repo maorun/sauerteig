@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  calcFridgePlan,
+  FRIDGE_DURATIONS,
+  FRIDGE_OPTIONS,
+  isFridgeDuration,
   buildSchedule,
   getDeadlineStatus,
   checkStarterSupply,
@@ -471,5 +475,47 @@ describe('getDeadlineStatus', () => {
   });
   it('is overdue after the deadline with negative time left', () => {
     expect(getDeadlineStatus(13, timing)).toEqual({ level: 'overdue', hoursLeft: -1 });
+  });
+});
+
+describe('fridge storage plan', () => {
+  const fed = new Date('2026-11-22T10:00:00Z');
+  it('offers the durations 2-3 days and 1 week', () => {
+    expect(FRIDGE_DURATIONS).toEqual(['short', 'week']);
+    expect(isFridgeDuration('week')).toBe(true);
+    expect(isFridgeDuration('month')).toBe(false);
+    expect(isFridgeDuration('toString')).toBe(false);
+  });
+  it('recommends a richer ratio for the longer storage', () => {
+    const short = FRIDGE_OPTIONS.short.ratio;
+    const week = FRIDGE_OPTIONS.week.ratio;
+    expect(short.starter / (short.flour + short.water + short.starter)).toBeGreaterThan(
+      week.starter / (week.flour + week.water + week.starter),
+    );
+  });
+  it('plans the short storage with the re-feed after 3 days', () => {
+    const plan = calcFridgePlan('short', fed, 150);
+    expect(plan.ratio).toEqual({ flour: 2, water: 2, starter: 1 });
+    expect(plan.amounts).toEqual({ flour: 60, water: 60, starter: 30 });
+    expect(plan.nextFeed.toISOString()).toBe('2026-11-25T10:00:00.000Z');
+  });
+  it('plans the week storage with the re-feed after 7 days', () => {
+    const plan = calcFridgePlan('week', fed, 110);
+    expect(plan.ratio).toEqual({ flour: 5, water: 5, starter: 1 });
+    expect(plan.amounts).toEqual({ flour: 50, water: 50, starter: 10 });
+    expect(plan.nextFeed.toISOString()).toBe('2026-11-29T10:00:00.000Z');
+  });
+  it('keeps the amounts adding up to the total', () => {
+    const a = calcFridgePlan('week', fed, 101).amounts;
+    expect(a.flour + a.water + a.starter).toBe(101);
+  });
+  it('does not change the shared option table through the result', () => {
+    calcFridgePlan('short', fed, 150).ratio.flour = 99;
+    expect(FRIDGE_OPTIONS.short.ratio.flour).toBe(2);
+  });
+  it('rejects invalid input', () => {
+    expect(() => calcFridgePlan('month' as never, fed, 150)).toThrow(RangeError);
+    expect(() => calcFridgePlan('short', new Date(NaN), 150)).toThrow(RangeError);
+    expect(() => calcFridgePlan('short', fed, 0)).toThrow(RangeError);
   });
 });
