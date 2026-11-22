@@ -13,6 +13,9 @@ import {
   isFlourType,
   checkStarterSupply,
   MAX_INVENTORY_G,
+  MAX_TOTAL_G,
+  parseTrackerInputs,
+  serializeTrackerInputs,
   parseInventoryGrams,
   parseStarterInventory,
   serializeStarterInventory,
@@ -32,7 +35,7 @@ import { nextTab, TAB_NAMES, type TabName } from './tabs';
 const STORE_KEY = 'sauerteig:start';
 const FLOUR_KEY = 'sauerteig:flour';
 const INVENTORY_KEY = 'sauerteig:inventory';
-const MAX_TOTAL_G = 1_000_000;
+const TRACKER_KEY = 'sauerteig:tracker';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -116,6 +119,16 @@ const savedFlour = store.get(FLOUR_KEY);
 const initialFlour: FlourType = isFlourType(savedFlour) ? savedFlour : DEFAULT_FLOUR;
 flourEl.value = initialFlour;
 
+// An invalid or missing stored set keeps the defaults from the HTML.
+const savedTracker = parseTrackerInputs(store.get(TRACKER_KEY));
+if (savedTracker) {
+  ratioFlourEl.value = String(savedTracker.ratio.flour);
+  ratioWaterEl.value = String(savedTracker.ratio.water);
+  ratioStarterEl.value = String(savedTracker.ratio.starter);
+  tempEl.value = String(savedTracker.tempC);
+  totalEl.value = String(savedTracker.totalG);
+}
+
 // --- Starter inventory ---
 const invGramsEl = $<HTMLInputElement>('inv-grams');
 const invFlourEl = $<HTMLSelectElement>('inv-flour');
@@ -198,6 +211,8 @@ function render(): void {
   if (!Number.isFinite(total) || total <= 0 || total > MAX_TOTAL_G) {
     return showError(`Menge muss zwischen 1 und ${MAX_TOTAL_G} g liegen.`);
   }
+  // Only a valid set gets stored, so a half-typed value never replaces the last good one.
+  store.set(serializeTrackerInputs({ ratio, tempC: temp, totalG: total }), TRACKER_KEY);
   if (Number.isNaN(start.getTime())) return showError('Startzeit ungültig.');
   showError(null);
 
