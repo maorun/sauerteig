@@ -19,14 +19,6 @@ Rules for this file:
 
 ## Priority 2
 
-### Visual separation of target-time calculator (`separate-target-calculator`)
-
-- **Rank:** Feature model. Total 28/40 (baking 7, usability 9, harmony 6, safety 6). Effort S. Estimate.
-- **Code:** `index.html`, `src/main.ts`, `src/style.css`.
-- **Problem:** The target-time calculator is currently placed in the middle of the main tracker, confusing the user flow.
-- **Goal:** Separate the target-time calculator and the main tracker into distinct sections or tabs with clear visual boundaries.
-- **Acceptance test:** Opening the PWA presents distinct tabs or separated views for the forward tracker and the reverse target-time calculator.
-
 ### Split ratio inputs into separate number inputs (`split-ratio-number-inputs`)
 
 - **Rank:** Feature model. Total 27/40 (baking 7, usability 9, harmony 6, safety 5). Effort S. Estimate.

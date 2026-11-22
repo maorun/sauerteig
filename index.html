@@ -14,6 +14,12 @@
     <main id="app">
       <h1>Sauerteig Anstellgut</h1>
 
+      <div class="tabs" role="tablist" aria-label="Ansicht">
+        <button id="tab-tracker" class="tab" type="button" role="tab" aria-selected="true" aria-controls="panel-tracker">Tracker</button>
+        <button id="tab-target" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-target" tabindex="-1">Zielzeit-Rechner</button>
+      </div>
+
+      <div id="panel-tracker" class="panel" role="tabpanel" aria-labelledby="tab-tracker">
       <form id="form" class="card" novalidate>
         <label>Verhältnis Mehl : Wasser : ASG
           <input id="ratio" inputmode="text" value="1:1:1" autocomplete="off" />
@@ -40,6 +46,47 @@
         <p id="error" role="alert" class="error" hidden></p>
       </form>
 
+      <section class="card" aria-labelledby="h-amounts">
+        <h2 id="h-amounts">Zutaten</h2>
+        <dl class="grid">
+          <div><dt>Mehl</dt><dd id="o-flour">–</dd></div>
+          <div><dt>Wasser</dt><dd id="o-water">–</dd></div>
+          <div><dt>ASG</dt><dd id="o-starter">–</dd></div>
+        </dl>
+      </section>
+
+      <section class="card" aria-labelledby="h-time">
+        <h2 id="h-time">Zeit bis Peak</h2>
+        <dl class="grid">
+          <div><dt>Verdopplung</dt><dd id="o-doubling">–</dd></div>
+          <div><dt>Maximale Aktivität</dt><dd id="o-peak">–</dd></div>
+        </dl>
+      </section>
+
+      <section class="card" aria-labelledby="h-sched">
+        <h2 id="h-sched">Zeitplan</h2>
+        <ul class="schedule">
+          <li><span>Start</span><time id="s-start"></time></li>
+          <li><span>Peak</span><time id="s-peak"></time></li>
+          <li><span>Lagerfenster bis</span><time id="s-end"></time></li>
+        </ul>
+      </section>
+
+      <section class="card" aria-labelledby="h-phase">
+        <h2 id="h-phase">Wachstumsphase</h2>
+        <p id="phase-name" class="phase" aria-live="polite">–</p>
+        <div id="bar" class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="h-phase">
+          <div id="bar-fill" class="bar-fill"></div>
+        </div>
+        <p id="countdown" class="countdown" aria-live="off">–</p>
+        <div class="row">
+          <button id="btn-start" type="button">Jetzt füttern</button>
+          <button id="btn-reset" type="button" class="secondary">Zurücksetzen</button>
+        </div>
+      </section>
+      </div>
+
+      <div id="panel-target" class="panel" role="tabpanel" aria-labelledby="tab-target" hidden>
       <section class="card" aria-labelledby="h-target">
         <h2 id="h-target">Zielzeit-Rechner</h2>
         <form id="target-form" class="target-form" novalidate>
@@ -83,45 +130,7 @@
           </table>
         </div>
       </section>
-
-      <section class="card" aria-labelledby="h-amounts">
-        <h2 id="h-amounts">Zutaten</h2>
-        <dl class="grid">
-          <div><dt>Mehl</dt><dd id="o-flour">–</dd></div>
-          <div><dt>Wasser</dt><dd id="o-water">–</dd></div>
-          <div><dt>ASG</dt><dd id="o-starter">–</dd></div>
-        </dl>
-      </section>
-
-      <section class="card" aria-labelledby="h-time">
-        <h2 id="h-time">Zeit bis Peak</h2>
-        <dl class="grid">
-          <div><dt>Verdopplung</dt><dd id="o-doubling">–</dd></div>
-          <div><dt>Maximale Aktivität</dt><dd id="o-peak">–</dd></div>
-        </dl>
-      </section>
-
-      <section class="card" aria-labelledby="h-sched">
-        <h2 id="h-sched">Zeitplan</h2>
-        <ul class="schedule">
-          <li><span>Start</span><time id="s-start"></time></li>
-          <li><span>Peak</span><time id="s-peak"></time></li>
-          <li><span>Lagerfenster bis</span><time id="s-end"></time></li>
-        </ul>
-      </section>
-
-      <section class="card" aria-labelledby="h-phase">
-        <h2 id="h-phase">Wachstumsphase</h2>
-        <p id="phase-name" class="phase" aria-live="polite">–</p>
-        <div id="bar" class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="h-phase">
-          <div id="bar-fill" class="bar-fill"></div>
-        </div>
-        <p id="countdown" class="countdown" aria-live="off">–</p>
-        <div class="row">
-          <button id="btn-start" type="button">Jetzt füttern</button>
-          <button id="btn-reset" type="button" class="secondary">Zurücksetzen</button>
-        </div>
-      </section>
+      </div>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
