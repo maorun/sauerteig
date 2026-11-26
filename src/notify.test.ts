@@ -24,7 +24,7 @@ describe('planNotifications', () => {
     const plan = planNotifications(start, timing, start.getTime());
     expect(plan.map((n) => n.tag)).toEqual(['peak', 'urgent']);
     expect(plan[0].body).toContain('Peak');
-    expect(plan[1].body).toMatch(/Frist \d\d:\d\d Uhr/);
+    expect(plan[1].body).toMatch(/Auffrischen bis \d\d:\d\d Uhr/);
   });
 
   it('drops a notification that already lies in the past', () => {
