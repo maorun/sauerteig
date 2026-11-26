@@ -198,38 +198,67 @@ describe('calcTiming', () => {
     const t = calcTiming(r111, 24);
     expect(t.windowEndHours).toBeGreaterThan(t.peakHours);
   });
+
+  it('starts the refresh window after a decline as long as the rise and keeps it short', () => {
+    const t = calcTiming(r111, 24);
+    expect(t.refreshStartHours).toBeCloseTo(2 * t.peakHours, 10);
+    expect(t.windowEndHours).toBeCloseTo(2.2 * t.peakHours, 10);
+  });
+
+  it('adds a rescue window of one doubling at the ambient temperature after the deadline', () => {
+    for (const temp of [10, 18, 24, 30]) {
+      const t = calcTiming(r111, temp);
+      expect(t.rescueEndHours - t.windowEndHours).toBeCloseTo(doublingTimeHours(temp), 10);
+    }
+    expect(calcTiming(r111, 24).rescueEndHours - calcTiming(r111, 24).windowEndHours).toBeCloseTo(3.5, 10);
+  });
+
+  it('makes the rescue window depend on the temperature only, not on flour or ratio', () => {
+    const rescue = (t: ReturnType<typeof calcTiming>) => t.rescueEndHours - t.windowEndHours;
+    const base = rescue(calcTiming(r111, 22));
+    expect(rescue(calcTiming({ flour: 5, water: 5, starter: 1 }, 22, 'rye-whole'))).toBeCloseTo(base, 10);
+    expect(rescue(calcTiming(r111, 28))).toBeLessThan(base);
+  });
 });
 
 describe('buildSchedule', () => {
   it('computes peak and storage window dates', () => {
     const start = new Date('2026-01-01T08:00:00Z');
-    const s = buildSchedule(start, { peakHours: 6, doublingHours: 4.8, windowEndHours: 9 });
+    const s = buildSchedule(start, { peakHours: 6, doublingHours: 4.8, refreshStartHours: 8, windowEndHours: 9, rescueEndHours: 12 });
     expect(s.start).toEqual(start);
     expect(s.peak.toISOString()).toBe('2026-01-01T14:00:00.000Z');
+    expect(s.refreshStart.toISOString()).toBe('2026-01-01T16:00:00.000Z');
     expect(s.windowEnd.toISOString()).toBe('2026-01-01T17:00:00.000Z');
+    expect(s.rescueEnd.toISOString()).toBe('2026-01-01T20:00:00.000Z');
     expect(s.doubling.toISOString()).toBe('2026-01-01T12:48:00.000Z');
   });
 });
 
 describe('getPhase', () => {
-  const timing = { peakHours: 6, doublingHours: 4.8, windowEndHours: 9 };
+  const timing = { peakHours: 6, doublingHours: 4.8, refreshStartHours: 12, windowEndHours: 13.2, rescueEndHours: 16 };
   it('walks through the phases', () => {
     expect(getPhase(0, timing).name).toBe('lag');
     expect(getPhase(2, timing).name).toBe('growth');
     expect(getPhase(6, timing).name).toBe('peak');
     expect(getPhase(8, timing).name).toBe('decline');
-    expect(getPhase(10, timing).name).toBe('over');
+    expect(getPhase(12.5, timing).name).toBe('refresh');
+    expect(getPhase(14, timing).name).toBe('rescue');
+    expect(getPhase(17, timing).name).toBe('over');
   });
   it('switches phases exactly at the boundaries', () => {
-    // doubling*0.25 = 1.2 h, peak band = 0.6 h, window end = 9 h
+    // doubling*0.25 = 1.2 h, peak band = 0.6 h, refresh 12..13.2 h, rescue until 16 h
     expect(getPhase(1.19, timing).name).toBe('lag');
     expect(getPhase(1.2, timing).name).toBe('growth');
     expect(getPhase(5.39, timing).name).toBe('growth');
     expect(getPhase(5.4, timing).name).toBe('peak');
     expect(getPhase(6.6, timing).name).toBe('peak');
     expect(getPhase(6.61, timing).name).toBe('decline');
-    expect(getPhase(9, timing).name).toBe('decline');
-    expect(getPhase(9.01, timing).name).toBe('over');
+    expect(getPhase(11.99, timing).name).toBe('decline');
+    expect(getPhase(12, timing).name).toBe('refresh');
+    expect(getPhase(13.2, timing).name).toBe('refresh');
+    expect(getPhase(13.21, timing).name).toBe('rescue');
+    expect(getPhase(16, timing).name).toBe('rescue');
+    expect(getPhase(16.01, timing).name).toBe('over');
   });
   it('reports progress 0..1 and clamps', () => {
     expect(getPhase(-1, timing).progress).toBe(0);
@@ -467,26 +496,33 @@ describe('starter inventory', () => {
 });
 
 describe('getDeadlineStatus', () => {
-  const timing = { doublingHours: 4, peakHours: 8, windowEndHours: 12 };
+  const timing = { doublingHours: 4, peakHours: 8, refreshStartHours: 16, windowEndHours: 18, rescueEndHours: 21 };
   it('is ok before the peak and reports the time to the deadline', () => {
-    expect(getDeadlineStatus(2, timing)).toEqual({ level: 'ok', hoursLeft: 10 });
+    expect(getDeadlineStatus(2, timing)).toEqual({ level: 'ok', hoursLeft: 16, rescueHoursLeft: 19 });
   });
-  it('warns after the peak', () => {
-    expect(getDeadlineStatus(9, timing)).toEqual({ level: 'soon', hoursLeft: 3 });
+  it('warns in the decline after the peak', () => {
+    expect(getDeadlineStatus(9, timing)).toEqual({ level: 'soon', hoursLeft: 9, rescueHoursLeft: 12 });
   });
-  it('turns urgent within a quarter of the peak time before the deadline', () => {
-    expect(getDeadlineStatus(10, timing).level).toBe('urgent');
-    expect(getDeadlineStatus(12, timing)).toEqual({ level: 'urgent', hoursLeft: 0 });
+  it('turns urgent only in the refresh window', () => {
+    expect(getDeadlineStatus(15, timing).level).toBe('soon');
+    expect(getDeadlineStatus(17, timing).level).toBe('urgent');
+    expect(getDeadlineStatus(18, timing)).toEqual({ level: 'urgent', hoursLeft: 0, rescueHoursLeft: 3 });
+  });
+  it('is overdue only in the rescue window', () => {
+    expect(getDeadlineStatus(19, timing)).toEqual({ level: 'overdue', hoursLeft: -1, rescueHoursLeft: 2 });
+    expect(getDeadlineStatus(21, timing).level).toBe('overdue');
+  });
+  it('is lost after the rescue window', () => {
+    expect(getDeadlineStatus(22, timing)).toEqual({ level: 'lost', hoursLeft: -4, rescueHoursLeft: -1 });
   });
   it('switches level exactly at the boundaries', () => {
-    expect(getDeadlineStatus(8, timing).level).toBe('soon');
     expect(getDeadlineStatus(7.99, timing).level).toBe('ok');
-    expect(getDeadlineStatus(10, timing).level).toBe('urgent'); // 2 h left = 25 % of the peak time
-    expect(getDeadlineStatus(9.99, timing).level).toBe('soon');
-    expect(getDeadlineStatus(-2, timing)).toEqual({ level: 'ok', hoursLeft: 14 });
-  });
-  it('is overdue after the deadline with negative time left', () => {
-    expect(getDeadlineStatus(13, timing)).toEqual({ level: 'overdue', hoursLeft: -1 });
+    expect(getDeadlineStatus(8, timing).level).toBe('soon');
+    expect(getDeadlineStatus(15.99, timing).level).toBe('soon');
+    expect(getDeadlineStatus(16, timing).level).toBe('urgent');
+    expect(getDeadlineStatus(18.01, timing).level).toBe('overdue');
+    expect(getDeadlineStatus(21.01, timing).level).toBe('lost');
+    expect(getDeadlineStatus(-2, timing)).toEqual({ level: 'ok', hoursLeft: 20, rescueHoursLeft: 23 });
   });
 });
 
@@ -534,7 +570,7 @@ describe('fridge storage plan', () => {
 
 describe('calcCombinedSchedule', () => {
   const start = new Date('2026-11-22T08:00:00Z');
-  const schedule = buildSchedule(start, { peakHours: 6, doublingHours: 4.8, windowEndHours: 9 });
+  const schedule = buildSchedule(start, { peakHours: 6, doublingHours: 4.8, refreshStartHours: 8, windowEndHours: 9, rescueEndHours: 12 });
   it('moves from the peak at ambient temperature to the fridge at the window end', () => {
     const c = calcCombinedSchedule(schedule, 'short');
     expect(c.peak.toISOString()).toBe('2026-11-22T14:00:00.000Z');

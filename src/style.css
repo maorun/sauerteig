@@ -65,7 +65,8 @@ dd { margin: 0; font-size: 1.4rem; font-weight: 700; }
 .deadline { margin: 0 0 0.75rem; padding: 0.6rem; border: 2px solid var(--border); border-radius: 0.5rem; font-weight: 700; }
 .deadline[data-level="soon"] { border-color: var(--warn); color: var(--warn); }
 .deadline[data-level="urgent"] { border-color: var(--error); color: var(--error); }
-.deadline[data-level="overdue"] { border-color: var(--error); background: var(--error); color: var(--card); }
+.deadline[data-level="overdue"],
+.deadline[data-level="lost"] { border-color: var(--error); background: var(--error); color: var(--card); }
 .deadline-row span, .deadline-row time { font-weight: 700; color: var(--warn); }
 .row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 button {

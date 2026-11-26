@@ -34,7 +34,7 @@ export function planNotifications(start: Date, timing: Timing, now: number): Pla
       tag: 'urgent',
       at: t.urgent.getTime(),
       title: 'Sauerteig: Jetzt füttern!',
-      body: `Frist ${fmtClock.format(t.windowEnd)} Uhr. Danach verhungert die ASG.`,
+      body: `Auffrischen bis ${fmtClock.format(t.windowEnd)} Uhr. Danach beginnt das Rettungsfenster.`,
     },
   ];
   return plan.filter((n) => n.at > now);

@@ -62,7 +62,9 @@ const PHASE_LABEL: Record<PhaseName, string> = {
   growth: 'Wachstum',
   peak: 'Peak – jetzt verwenden oder füttern',
   decline: 'Absinkend',
-  over: 'Über dem Peak – bald füttern',
+  refresh: 'Auffrischen – jetzt füttern',
+  rescue: 'Rettungsfenster – sofort füttern',
+  over: 'Zu spät – neu ansetzen',
 };
 
 const fmtTime = new Intl.DateTimeFormat('de-DE', {
@@ -263,7 +265,7 @@ notifyBtn.addEventListener('click', () => {
     .catch(() => updateNotifyUi());
 });
 
-const OUTPUT_IDS = ['o-flour', 'o-water', 'o-starter', 'o-doubling', 'o-peak', 's-start', 's-peak', 's-end', 's-stable', 's-fridge-short', 's-fridge-week'];
+const OUTPUT_IDS = ['o-flour', 'o-water', 'o-starter', 'o-doubling', 'o-peak', 's-start', 's-peak', 's-end', 's-rescue', 's-stable', 's-fridge-short', 's-fridge-week'];
 
 function showError(msg: string | null): void {
   errorEl.hidden = msg === null;
@@ -316,6 +318,7 @@ function render(): void {
   $('s-start').textContent = fmtTime.format(schedule.start);
   $('s-peak').textContent = fmtTime.format(schedule.peak);
   $('s-end').textContent = fmtTime.format(schedule.windowEnd);
+  $('s-rescue').textContent = fmtTime.format(schedule.rescueEnd);
   // The window end is the latest transfer into the fridge, so the chilled stage starts there.
   const toFridge = calcCombinedSchedule(schedule, 'short');
   $('s-stable').textContent = fmtDuration(toFridge.ambientStableHours);
@@ -344,14 +347,18 @@ function render(): void {
     const deadlineEl = $('deadline');
     deadlineEl.dataset.level = deadline.level;
     const at = fmtTime.format(schedule.windowEnd);
+    const rescueAt = fmtTime.format(schedule.rescueEnd);
+    // Only the rescue window shows "Sofort füttern". After it, a single feed does not save the culture.
     deadlineEl.textContent =
-      deadline.level === 'overdue'
-        ? `⚠ Frist überschritten seit ${fmtDuration(-deadline.hoursLeft)} – Säure staut sich, ASG verhungert. Sofort füttern!`
-        : deadline.level === 'urgent'
-          ? `⚠ Jetzt füttern! Frist ${at} – noch ${fmtDuration(deadline.hoursLeft)}, danach verhungert die ASG`
-          : deadline.level === 'soon'
-            ? `⚠ Spätestens ${at} füttern – noch ${fmtDuration(deadline.hoursLeft)}`
-            : `Füttern spätestens ${at} (in ${fmtDuration(deadline.hoursLeft)})`;
+      deadline.level === 'lost'
+        ? `✖ Rettungsfenster vorbei seit ${fmtDuration(-deadline.rescueHoursLeft)} – ASG neu ansetzen: mehrfach auffrischen, bis sie wieder aktiv ist`
+        : deadline.level === 'overdue'
+          ? `⚠ Rettungsfenster bis ${rescueAt} – noch ${fmtDuration(deadline.rescueHoursLeft)}. Säure staut sich, ASG verhungert. Sofort füttern!`
+          : deadline.level === 'urgent'
+            ? `⚠ Jetzt füttern! Frist ${at} – noch ${fmtDuration(deadline.hoursLeft)}, danach beginnt das Rettungsfenster`
+            : deadline.level === 'soon'
+              ? `⚠ Spätestens ${at} füttern – noch ${fmtDuration(deadline.hoursLeft)}`
+              : `Füttern spätestens ${at} (in ${fmtDuration(deadline.hoursLeft)})`;
   };
   update();
   tick = window.setInterval(update, 1000);

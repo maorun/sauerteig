@@ -15,21 +15,27 @@ export interface Timing {
   doublingHours: number;
   /** Hours until maximum activity. */
   peakHours: number;
-  /** Hours until the storage window (usable after peak) ends. */
+  /** Hours until the decline ends and the short refresh window starts (2 × peak time). */
+  refreshStartHours: number;
+  /** Hours until the refresh window ends. This is the refresh deadline. */
   windowEndHours: number;
+  /** Hours until the rescue window after the deadline ends. Its length depends on the temperature only. */
+  rescueEndHours: number;
 }
 
 export interface Schedule {
   start: Date;
   doubling: Date;
   peak: Date;
+  refreshStart: Date;
   windowEnd: Date;
+  rescueEnd: Date;
 }
 
 /** Flour types, from fastest to slowest fermentation. */
 export type FlourType = 'rye-whole' | 'rye' | 'wheat-whole' | 'spelt' | 'wheat-white';
 
-export type PhaseName = 'lag' | 'growth' | 'peak' | 'decline' | 'over';
+export type PhaseName = 'lag' | 'growth' | 'peak' | 'decline' | 'refresh' | 'rescue' | 'over';
 
 export interface Phase {
   name: PhaseName;
@@ -53,7 +59,12 @@ export const MIN_TEMP_C = 4;
 export const MAX_TEMP_C = 38;
 /** Peak lies at the point where the volume has tripled (log2(3) doublings). */
 const PEAK_DOUBLINGS = Math.log2(3);
-const WINDOW_FACTOR = 1.5;
+/** The decline after the peak lasts as long as the rise, so the refresh window starts at 2 × peak time. */
+const REFRESH_START_FACTOR = 2;
+/** Length of the short refresh window, as a share of the peak time. */
+const REFRESH_WINDOW_FACTOR = 0.2;
+/** Length of the rescue window, in doublings at the ambient temperature (flour and ratio do not apply). */
+const RESCUE_DOUBLINGS = 1;
 
 /**
  * Time factor per flour type relative to wheat flour type 550 (1.0).
@@ -143,10 +154,14 @@ export function calcTiming(ratio: Ratio, tempC: number, flour: FlourType = DEFAU
   const hydration = ratio.water / ratio.flour;
   const hydrationFactor = Math.min(1.25, Math.max(0.8, 1 - 0.15 * Math.log2(hydration)));
   const peakHours = base * PEAK_DOUBLINGS * starterFactor * hydrationFactor * flourSpeedFactor(flour);
+  const refreshStartHours = peakHours * REFRESH_START_FACTOR;
+  const windowEndHours = refreshStartHours + peakHours * REFRESH_WINDOW_FACTOR;
   return {
     doublingHours: peakHours / PEAK_DOUBLINGS,
     peakHours,
-    windowEndHours: peakHours * WINDOW_FACTOR,
+    refreshStartHours,
+    windowEndHours,
+    rescueEndHours: windowEndHours + base * RESCUE_DOUBLINGS,
   };
 }
 
@@ -156,7 +171,9 @@ export function buildSchedule(start: Date, timing: Timing): Schedule {
     start,
     doubling: at(timing.doublingHours),
     peak: at(timing.peakHours),
+    refreshStart: at(timing.refreshStartHours),
     windowEnd: at(timing.windowEndHours),
+    rescueEnd: at(timing.rescueEndHours),
   };
 }
 
@@ -164,40 +181,45 @@ export function getPhase(elapsedHours: number, timing: Timing): Phase {
   const progress = Math.min(1, Math.max(0, elapsedHours / timing.peakHours));
   const e = elapsedHours;
   const peakBand = timing.peakHours * 0.1;
-  if (e > timing.windowEndHours) return { name: 'over', progress };
+  if (e > timing.rescueEndHours) return { name: 'over', progress };
+  if (e > timing.windowEndHours) return { name: 'rescue', progress };
+  if (e >= timing.refreshStartHours) return { name: 'refresh', progress };
   if (e > timing.peakHours + peakBand) return { name: 'decline', progress };
   if (e >= timing.peakHours - peakBand) return { name: 'peak', progress };
   if (e < timing.doublingHours * 0.25) return { name: 'lag', progress };
   return { name: 'growth', progress };
 }
 
-export type DeadlineLevel = 'ok' | 'soon' | 'urgent' | 'overdue';
+export type DeadlineLevel = 'ok' | 'soon' | 'urgent' | 'overdue' | 'lost';
 
 export interface DeadlineStatus {
   level: DeadlineLevel;
-  /** Hours until the refresh deadline (the end of the window). Negative if passed. */
+  /** Hours until the refresh deadline (the end of the refresh window). Negative if passed. */
   hoursLeft: number;
+  /** Hours until the end of the rescue window. Negative if passed. */
+  rescueHoursLeft: number;
 }
 
-/** Share of the peak time before the deadline at which the warning turns urgent. */
-const URGENT_BAND = 0.25;
-
 /**
- * Rates the time left until the refresh deadline (windowEndHours), where acid builds up
- * and the culture starves. `ok` before the peak, `soon` after the peak, `urgent` shortly
- * before the deadline and `overdue` after it.
+ * Rates the time against the refresh window (refreshStartHours..windowEndHours) and the
+ * rescue window after it, where acid builds up and the culture starves.
+ * `ok` before the peak, `soon` in the decline, `urgent` in the refresh window,
+ * `overdue` in the rescue window and `lost` after the rescue window.
  */
 export function getDeadlineStatus(elapsedHours: number, timing: Timing): DeadlineStatus {
   const hoursLeft = timing.windowEndHours - elapsedHours;
-  if (hoursLeft < 0) return { level: 'overdue', hoursLeft };
-  if (hoursLeft <= timing.peakHours * URGENT_BAND) return { level: 'urgent', hoursLeft };
-  if (elapsedHours >= timing.peakHours) return { level: 'soon', hoursLeft };
-  return { level: 'ok', hoursLeft };
+  const rescueHoursLeft = timing.rescueEndHours - elapsedHours;
+  const status = (level: DeadlineLevel): DeadlineStatus => ({ level, hoursLeft, rescueHoursLeft });
+  if (rescueHoursLeft < 0) return status('lost');
+  if (hoursLeft < 0) return status('overdue');
+  if (elapsedHours >= timing.refreshStartHours) return status('urgent');
+  if (elapsedHours >= timing.peakHours) return status('soon');
+  return status('ok');
 }
 
-/** Start of the `urgent` deadline level, as hours after the start. */
+/** Start of the `urgent` deadline level (the refresh window), as hours after the start. */
 export function urgentStartHours(timing: Timing): number {
-  return timing.windowEndHours - timing.peakHours * URGENT_BAND;
+  return timing.refreshStartHours;
 }
 
 export function splitHours(hours: number): { hours: number; minutes: number } {
